@@ -22,6 +22,27 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - Use descriptive names for variables and methods. For example, `isRegisteredForDiscounts`, not `discount()`.
 - Check for existing components to reuse before writing a new one.
 
+## Engineering Standards
+
+- Follow Laravel's documented best practices and the installed package versions. Prefer framework conventions over custom abstractions.
+- Apply SOLID principles pragmatically: keep responsibilities focused, depend on contracts where useful, and avoid speculative abstractions.
+- Use test-driven development for behavior changes: write or update the failing PHPUnit test first, implement the smallest change that makes it pass, then refactor.
+- Every new feature must include appropriate automated coverage. Prefer feature tests for application behavior and unit tests for isolated logic.
+- All database operations must happen on the backend. Frontend code must never connect directly to the database, execute queries, contain database credentials, or implement database mutations. Use authenticated Laravel routes, controllers, jobs, services, and validated requests as the boundary between the frontend and database.
+- Database queries must be efficient and intentional. Prevent N+1 queries, load relationships using the appropriate strategy for the use case, select only required columns, paginate large result sets, use suitable indexes and constraints, and verify query behavior with tests or profiling when performance matters. Lazy loading may be appropriate in some cases, but it is not the default or sole optimization strategy.
+
+## Frontend Component Architecture
+
+- Do not enforce Atomic Design as a rigid folder taxonomy. Use a simpler layered approach:
+  - `resources/js/components/ui/` for reusable shadcn primitives.
+  - `resources/js/components/` for reusable shared components composed from primitives.
+  - Feature or page folders for components that belong to one bounded feature.
+  - `resources/js/layouts/` for page and authentication layouts.
+- Search for an existing component before creating a new one. Extend or compose an existing component when the behavior is substantially the same.
+- Keep components focused and reusable through explicit props. Do not duplicate markup, validation, loading states, or interaction patterns across pages.
+- Promote a feature component to the shared component layer only when it has a clear reuse case; avoid premature generic components.
+- Keep business rules and API calls out of presentational components. Put reusable behavior in hooks, services, or server-side application code according to the existing project convention.
+
 ## Verification Scripts
 
 - Do not create verification scripts or tinker when tests cover that functionality and prove they work. Unit and feature tests are more important.
