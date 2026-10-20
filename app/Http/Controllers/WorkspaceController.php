@@ -52,7 +52,7 @@ class WorkspaceController extends Controller
         ]);
 
         try {
-            $result = $this->inference->prompt($validated['provider'], $validated['prompt']);
+            $result = $this->inference->prompt($request->user(), $validated['provider'], $validated['prompt']);
         } catch (Throwable) {
             return response()->json(['message' => 'The selected provider is unavailable.'], 503);
         }
@@ -63,6 +63,9 @@ class WorkspaceController extends Controller
     /** @return array<string, mixed> */
     private function workspace(Request $request): array
     {
+        $providers = $this->inference->status($request->user());
+        $hasAvailableProvider = collect($providers)->contains('status', 'available');
+
         return [
             'status' => 'ready',
             'greeting' => 'Welcome back, '.$request->user()->name.'.',
@@ -70,10 +73,12 @@ class WorkspaceController extends Controller
             'conversation' => ['status' => 'empty', 'messages' => []],
             'sources' => [],
             'provider' => [
-                'status' => 'available',
-                'message' => 'Provider status is available for configured providers.',
+                'status' => $hasAvailableProvider ? 'available' : 'unavailable',
+                'message' => $hasAvailableProvider
+                    ? 'Provider status is available for configured providers.'
+                    : 'Connect an eligible provider before requesting inference.',
             ],
-            'providers' => $this->inference->status(),
+            'providers' => $providers,
             'capabilities' => [
                 ['name' => 'AdKit read access', 'status' => 'ready'],
                 ['name' => 'Zernio read access', 'status' => 'ready'],
