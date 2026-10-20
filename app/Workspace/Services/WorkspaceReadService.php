@@ -3,6 +3,7 @@
 namespace App\Workspace\Services;
 
 use App\AdKit\Services\AdKitReadService;
+use App\Workspace\Contracts\WorkspaceAnalyst;
 use App\Workspace\Data\WorkspaceReadResult;
 use App\Zernio\Services\ZernioReadService;
 use InvalidArgumentException;
@@ -12,6 +13,7 @@ final readonly class WorkspaceReadService
     public function __construct(
         private AdKitReadService $adKit,
         private ZernioReadService $zernio,
+        private WorkspaceAnalyst $analyst,
     ) {}
 
     public function answer(string $provider, string $scopeId, string $question): WorkspaceReadResult
@@ -35,7 +37,7 @@ final readonly class WorkspaceReadService
 
         return new WorkspaceReadResult(
             $provider,
-            sprintf('%s accounts available: %d. Request analyzed: %s', ucfirst($provider), count($accounts), $question),
+            $this->analyst->analyze($question, $sources),
             $sources,
         );
     }
