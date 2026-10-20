@@ -23,6 +23,10 @@ class WorkspaceController extends Controller
                 'correlationId' => (string) Str::uuid(),
                 'conversation' => ['status' => 'empty', 'messages' => []],
                 'sources' => [],
+                'provider' => [
+                    'status' => 'available',
+                    'message' => 'Provider status is available for configured providers.',
+                ],
                 'providers' => $this->inference->status(),
                 'capabilities' => [
                     ['name' => 'AdKit read access', 'status' => 'deferred'],
