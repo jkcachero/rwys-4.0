@@ -7,6 +7,7 @@ Route::inertia('/', 'welcome')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', WorkspaceController::class)->name('dashboard');
+    Route::post('dashboard/prompt', [WorkspaceController::class, 'prompt'])->name('dashboard.prompt');
 });
 
 require __DIR__.'/settings.php';
