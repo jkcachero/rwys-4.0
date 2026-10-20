@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'workspace' => [
+        'ai_driver' => env('WORKSPACE_AI_DRIVER', 'fake'),
+    ],
+
 ];
