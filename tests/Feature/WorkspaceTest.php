@@ -24,7 +24,7 @@ class WorkspaceTest extends TestCase
         $this->actingAs($user)->get('/dashboard')->assertOk()->assertInertia(fn ($page) => $page
             ->component('dashboard')
             ->where('workspace.status', 'ready')
-            ->where('workspace.provider.status', 'ready')
+            ->where('workspace.provider.status', 'unavailable')
             ->where('workspace.capabilities.0.status', 'ready')
             ->where('workspace.capabilities.2.status', 'available')
             ->where('workspace.connections', [])

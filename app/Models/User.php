@@ -23,6 +23,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property string $role
  * @property Carbon|null $email_verified_at
  * @property string $password
+ * @property string $role
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
  * @property Carbon|null $two_factor_confirmed_at
@@ -52,6 +53,12 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
      *
      * @return array<string, string>
      */
+    /** @return HasMany<ProviderConnection, $this> */
+    public function providerConnections(): HasMany
+    {
+        return $this->hasMany(ProviderConnection::class);
+    }
+
     protected function casts(): array
     {
         return [

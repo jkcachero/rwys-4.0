@@ -1,7 +1,7 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, type RouteFormDefinition } from './../../../../wayfinder'
 /**
 * @see \App\Http\Controllers\WorkspaceController::__invoke
-* @see app/Http/Controllers/WorkspaceController.php:16
+* @see app/Http/Controllers/WorkspaceController.php:23
 * @route '/dashboard'
 */
 const WorkspaceController = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -16,7 +16,7 @@ WorkspaceController.definition = {
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::__invoke
-* @see app/Http/Controllers/WorkspaceController.php:16
+* @see app/Http/Controllers/WorkspaceController.php:23
 * @route '/dashboard'
 */
 WorkspaceController.url = (options?: RouteQueryOptions) => {
@@ -25,7 +25,7 @@ WorkspaceController.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::__invoke
-* @see app/Http/Controllers/WorkspaceController.php:16
+* @see app/Http/Controllers/WorkspaceController.php:23
 * @route '/dashboard'
 */
 WorkspaceController.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -35,7 +35,7 @@ WorkspaceController.get = (options?: RouteQueryOptions): RouteDefinition<'get'> 
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::__invoke
-* @see app/Http/Controllers/WorkspaceController.php:16
+* @see app/Http/Controllers/WorkspaceController.php:23
 * @route '/dashboard'
 */
 WorkspaceController.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -45,7 +45,7 @@ WorkspaceController.head = (options?: RouteQueryOptions): RouteDefinition<'head'
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::__invoke
-* @see app/Http/Controllers/WorkspaceController.php:16
+* @see app/Http/Controllers/WorkspaceController.php:23
 * @route '/dashboard'
 */
 const WorkspaceControllerForm = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -55,7 +55,7 @@ const WorkspaceControllerForm = (options?: RouteQueryOptions): RouteFormDefiniti
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::__invoke
-* @see app/Http/Controllers/WorkspaceController.php:16
+* @see app/Http/Controllers/WorkspaceController.php:23
 * @route '/dashboard'
 */
 WorkspaceControllerForm.get = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -65,7 +65,7 @@ WorkspaceControllerForm.get = (options?: RouteQueryOptions): RouteFormDefinition
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::__invoke
-* @see app/Http/Controllers/WorkspaceController.php:16
+* @see app/Http/Controllers/WorkspaceController.php:23
 * @route '/dashboard'
 */
 WorkspaceControllerForm.head = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -81,8 +81,64 @@ WorkspaceControllerForm.head = (options?: RouteQueryOptions): RouteFormDefinitio
 WorkspaceController.form = WorkspaceControllerForm
 
 /**
+* @see \App\Http\Controllers\WorkspaceController::prompt
+* @see app/Http/Controllers/WorkspaceController.php:49
+* @route '/dashboard/prompt'
+*/
+export const prompt = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
+    url: prompt.url(options),
+    method: 'post',
+})
+
+prompt.definition = {
+    methods: ["post"],
+    url: '/dashboard/prompt',
+} satisfies RouteDefinition<["post"]>
+
+/**
+* @see \App\Http\Controllers\WorkspaceController::prompt
+* @see app/Http/Controllers/WorkspaceController.php:49
+* @route '/dashboard/prompt'
+*/
+prompt.url = (options?: RouteQueryOptions) => {
+    return prompt.definition.url + queryParams(options)
+}
+
+/**
+* @see \App\Http\Controllers\WorkspaceController::prompt
+* @see app/Http/Controllers/WorkspaceController.php:49
+* @route '/dashboard/prompt'
+*/
+prompt.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
+    url: prompt.url(options),
+    method: 'post',
+})
+
+/**
+* @see \App\Http\Controllers\WorkspaceController::prompt
+* @see app/Http/Controllers/WorkspaceController.php:49
+* @route '/dashboard/prompt'
+*/
+const promptForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
+    action: prompt.url(options),
+    method: 'post',
+})
+
+/**
+* @see \App\Http\Controllers\WorkspaceController::prompt
+* @see app/Http/Controllers/WorkspaceController.php:49
+* @route '/dashboard/prompt'
+*/
+promptForm.post = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
+    action: prompt.url(options),
+    method: 'post',
+})
+
+prompt.form = promptForm
+
+/**
 * @see \App\Http\Controllers\WorkspaceController::read
-* @see app/Http/Controllers/WorkspaceController.php:23
+* @see app/Http/Controllers/WorkspaceController.php:30
 * @route '/workspace/read'
 */
 export const read = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -97,7 +153,7 @@ read.definition = {
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::read
-* @see app/Http/Controllers/WorkspaceController.php:23
+* @see app/Http/Controllers/WorkspaceController.php:30
 * @route '/workspace/read'
 */
 read.url = (options?: RouteQueryOptions) => {
@@ -106,7 +162,7 @@ read.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::read
-* @see app/Http/Controllers/WorkspaceController.php:23
+* @see app/Http/Controllers/WorkspaceController.php:30
 * @route '/workspace/read'
 */
 read.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -116,7 +172,7 @@ read.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::read
-* @see app/Http/Controllers/WorkspaceController.php:23
+* @see app/Http/Controllers/WorkspaceController.php:30
 * @route '/workspace/read'
 */
 const readForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -126,7 +182,7 @@ const readForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => (
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::read
-* @see app/Http/Controllers/WorkspaceController.php:23
+* @see app/Http/Controllers/WorkspaceController.php:30
 * @route '/workspace/read'
 */
 readForm.post = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -136,6 +192,7 @@ readForm.post = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
 
 read.form = readForm
 
+WorkspaceController.prompt = prompt
 WorkspaceController.read = read
 
 export default WorkspaceController

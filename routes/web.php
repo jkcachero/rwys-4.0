@@ -8,6 +8,7 @@ Route::inertia('/', 'welcome')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', WorkspaceController::class)->name('dashboard');
+    Route::post('dashboard/prompt', [WorkspaceController::class, 'prompt'])->name('dashboard.prompt');
     Route::post('workspace/read', [WorkspaceController::class, 'read'])->name('workspace.read');
     Route::get('workspace/connections', [AIConnectionController::class, 'index'])->name('workspace.connections.index');
     Route::post('workspace/connections', [AIConnectionController::class, 'store'])->name('workspace.connections.store');

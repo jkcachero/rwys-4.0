@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Settings\ProfileController;
+use App\Http\Controllers\Settings\ProviderConnectionController;
 use App\Http\Controllers\Settings\SecurityController;
 /* @chisel-password-confirmation */
 use Illuminate\Auth\Middleware\RequirePassword;
@@ -28,7 +29,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('user-password.update');
 
     Route::inertia('settings/appearance', 'settings/appearance')->name('appearance.edit');
+
+    Route::get('settings/connections', [ProviderConnectionController::class, 'index'])->name('connections.edit');
+    Route::get('settings/connections/openai', [ProviderConnectionController::class, 'connectOpenAi'])->name('connections.openai');
+    Route::post('settings/connections/{provider}/test', [ProviderConnectionController::class, 'test'])->name('connections.test');
+    Route::delete('settings/connections/{provider}', [ProviderConnectionController::class, 'disconnect'])->name('connections.disconnect');
 });
+
+Route::get('auth/callback', [ProviderConnectionController::class, 'callback'])->name('connections.callback');
 
 /* @chisel-passkeys */
 Route::get('.well-known/passkey-endpoints', function () {
