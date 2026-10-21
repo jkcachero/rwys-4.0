@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProviderConnection extends Model
 {
+    protected $hidden = ['access_token', 'refresh_token'];
+
     protected $fillable = [
         'provider',
         'client_id',

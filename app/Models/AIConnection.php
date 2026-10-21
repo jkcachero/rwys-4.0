@@ -14,6 +14,8 @@ class AIConnection extends Model
 
     protected $fillable = ['provider', 'label', 'auth_mode', 'credentials', 'model', 'status', 'last_validated_at'];
 
+    protected $hidden = ['credentials'];
+
     protected function casts(): array
     {
         return [
