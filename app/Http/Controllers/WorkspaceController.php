@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\AIConnectionService;
 use App\Workspace\Services\WorkspaceReadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -11,7 +12,10 @@ use Inertia\Response;
 
 class WorkspaceController extends Controller
 {
-    public function __construct(private readonly WorkspaceReadService $reads) {}
+    public function __construct(
+        private readonly WorkspaceReadService $reads,
+        private readonly AIConnectionService $connections,
+    ) {}
 
     public function __invoke(Request $request): Response
     {
@@ -48,11 +52,15 @@ class WorkspaceController extends Controller
             'correlationId' => (string) Str::uuid(),
             'conversation' => ['status' => 'empty', 'messages' => []],
             'sources' => [],
-            'provider' => ['status' => 'ready', 'message' => 'Approved read providers are available for analysis requests.'],
+            'provider' => [
+                'status' => 'ready',
+                'message' => 'Approved read providers are available. Personal AI connections are encrypted and owner-scoped.',
+            ],
+            'connections' => $this->connections->listFor($request->user()),
             'capabilities' => [
                 ['name' => 'AdKit read access', 'status' => 'ready'],
                 ['name' => 'Zernio read access', 'status' => 'ready'],
-                ['name' => 'Provider actions', 'status' => 'approval_required'],
+                ['name' => 'Personal OpenAI / Claude connections', 'status' => 'available'],
             ],
         ];
     }

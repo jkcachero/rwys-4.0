@@ -17,6 +17,15 @@ type Message = {
     content: string;
     sources: { provider: string; label: string; value: string }[];
 };
+type Connection = {
+    id: number;
+    provider: string;
+    label: string;
+    authMode: string;
+    model: string | null;
+    status: string;
+    lastValidatedAt: string | null;
+};
 type Workspace = {
     status: 'ready';
     greeting: string;
@@ -24,6 +33,7 @@ type Workspace = {
     conversation: { status: string; messages: Message[] };
     sources?: unknown[];
     provider: { status: string; message: string };
+    connections: Connection[];
     capabilities: { name: string; status: string }[];
 };
 
@@ -191,6 +201,28 @@ export default function Dashboard({ workspace }: { workspace: Workspace }) {
                         </CardContent>
                     </Card>
                 </div>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Personal AI connections</CardTitle>
+                        <CardDescription>
+                            Connections are encrypted on the server and visible only to your account.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                        {workspace.connections.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                                No personal OpenAI or Claude connection is configured yet.
+                            </p>
+                        ) : (
+                            workspace.connections.map((connection) => (
+                                <div className="flex items-center justify-between rounded-md border p-3 text-sm" key={connection.id}>
+                                    <span>{connection.provider} · {connection.label}</span>
+                                    <Badge variant="secondary">{connection.status}</Badge>
+                                </div>
+                            ))
+                        )}
+                    </CardContent>
+                </Card>
                 <div className="rounded-lg border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
                     Source evidence is shown with each result. Request:{' '}
                     {workspace.correlationId}
