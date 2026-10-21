@@ -11,6 +11,10 @@ const proxyToken = process.env.CHATGPT_COMPANION_PROXY_TOKEN ?? randomBytes(32).
 const discoveryUrl = `${ISSUER}/.well-known/openid-configuration`;
 const deviceSessions = new Map();
 
+const corsHeaders = (request) => ({
+    'access-control-allow-origin': process.env.CHATGPT_COMPANION_ALLOWED_ORIGIN ?? request.headers.origin ?? 'null',
+});
+
 const jsonResponse = (response, status, body, headers = {}) => {
     const payload = JSON.stringify(body);
     response.writeHead(status, {
@@ -207,7 +211,7 @@ async function serve() {
                 const session = deviceSessions.get(sessionId);
                 if (!session || session.expiresAt < Date.now()) {
                     deviceSessions.delete(sessionId);
-                    jsonResponse(response, 410, { error: 'This ChatGPT sign-in request expired.' });
+                    jsonResponse(response, 410, { error: 'This ChatGPT sign-in request expired.' }, corsHeaders(request));
                     return;
                 }
                 const result = await pollDeviceCode(session);
@@ -216,7 +220,7 @@ async function serve() {
                 return;
             }
             if (!requestToken(request)) {
-                jsonResponse(response, 401, { error: 'Companion authorization is required.' });
+                jsonResponse(response, 401, { error: 'Companion authorization is required.' }, corsHeaders(request));
                 return;
             }
             if (request.method === 'GET' && request.url === '/v1/chatgpt/status') {
@@ -227,7 +231,7 @@ async function serve() {
             if (request.method === 'POST' && request.url === '/v1/chatgpt/infer') {
                 const body = await readBody(request);
                 if (typeof body.prompt !== 'string' || body.prompt.trim() === '' || body.prompt.length > 10_000) {
-                    jsonResponse(response, 422, { error: 'prompt must be a non-empty string of at most 10000 characters.' });
+                    jsonResponse(response, 422, { error: 'prompt must be a non-empty string of at most 10000 characters.' }, corsHeaders(request));
                     return;
                 }
                 const provider = await discover();
@@ -235,9 +239,9 @@ async function serve() {
                 jsonResponse(response, 200, await invoke(connection, body.prompt.trim()));
                 return;
             }
-            jsonResponse(response, 404, { error: 'Not found.' });
+            jsonResponse(response, 404, { error: 'Not found.' }, corsHeaders(request));
         } catch (error) {
-            jsonResponse(response, 502, { error: error instanceof Error ? error.message : 'Companion request failed.' });
+            jsonResponse(response, 502, { error: error instanceof Error ? error.message : 'Companion request failed.' }, corsHeaders(request));
         }
     });
     server.listen(port, '127.0.0.1', () => {
