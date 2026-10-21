@@ -23,9 +23,13 @@ type Provider = {
 
 type Props = {
     providers: Provider[];
+    flash?: {
+        status?: string | null;
+        error?: string | null;
+    };
 };
 
-export default function Connections({ providers }: Props) {
+export default function Connections({ providers, flash }: Props) {
     return (
         <>
             <Head title="Provider connections" />
@@ -36,6 +40,17 @@ export default function Connections({ providers }: Props) {
                     title="Provider connections"
                     description="Connect approved provider accounts for bounded, tool-free inference."
                 />
+
+                {flash?.status && (
+                    <div role="status" className="rounded-md border border-green-600/30 bg-green-50 p-3 text-sm text-green-900">
+                        {flash.status}
+                    </div>
+                )}
+                {flash?.error && (
+                    <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                        {flash.error}
+                    </div>
+                )}
 
                 <div className="grid gap-4">
                     {providers.map((provider) => (

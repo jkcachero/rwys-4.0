@@ -50,4 +50,11 @@ class ProviderConnectionTest extends TestCase
     {
         $this->get('/auth/callback')->assertSessionHasErrors(['code', 'state']);
     }
+
+    public function test_oauth_callback_reports_an_expired_authorization_state(): void
+    {
+        $this->get('/auth/callback?code=code&state='.str_repeat('a', 64))
+            ->assertRedirect('/settings/connections')
+            ->assertSessionHas('error', 'The OAuth authorization has expired or was already used.');
+    }
 }

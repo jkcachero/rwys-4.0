@@ -59,8 +59,15 @@ class ProviderConnectionController
 
         try {
             $this->oauth->complete($request->string('code')->toString(), $request->string('state')->toString());
-        } catch (Throwable) {
-            return redirect()->route('connections.edit')->with('error', 'OpenAI authorization could not be completed.');
+        } catch (Throwable $exception) {
+            report($exception);
+
+            $message = $exception->getMessage();
+            $safeMessage = str_starts_with($message, 'The OAuth authorization') || str_starts_with($message, 'OpenAI did not') || str_starts_with($message, 'The account was not') || str_starts_with($message, 'OpenAI returned')
+                ? $message
+                : 'OpenAI authorization could not be completed. Please try again.';
+
+            return redirect()->route('connections.edit')->with('error', $safeMessage);
         }
 
         return redirect()->route('connections.edit')->with('status', 'OpenAI is connected for inference.');
