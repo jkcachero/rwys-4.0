@@ -22,6 +22,17 @@ class DatabaseSeeder extends Seeder
             'email' => 'test@example.com',
         ]);
 
-        $this->call(AdminAccessSeeder::class);
+        if (app()->environment('local')) {
+            $admin = User::query()->firstOrNew(['email' => 'johnkarlo.315@gmail.com']);
+            $admin->name = 'John Karlo';
+            $admin->role = 'admin';
+            $admin->email_verified_at ??= now();
+
+            if (! $admin->exists) {
+                $admin->password = env('LOCAL_ADMIN_PASSWORD', 'password');
+            }
+
+            $admin->save();
+        }
     }
 }

@@ -17,6 +17,7 @@ describe('Dashboard workspace', () => {
                     correlationId: 'request-123',
                     conversation: { status: 'empty', messages: [] },
                     sources: [],
+                    connections: [],
                     provider: {
                         status: 'deferred',
                         message: 'Provider reads are deferred until approved.',
@@ -24,7 +25,7 @@ describe('Dashboard workspace', () => {
                     capabilities: [
                         { name: 'AdKit read access', status: 'deferred' },
                         { name: 'Zernio read access', status: 'deferred' },
-                        { name: 'Provider actions', status: 'disabled' },
+                        { name: 'Personal OpenAI / Claude connections', status: 'available' },
                     ],
                 }}
             />,
@@ -32,9 +33,10 @@ describe('Dashboard workspace', () => {
 
         expect(markup).toContain('Welcome back, Ada.');
         expect(markup).toContain('No messages yet');
-        expect(markup).toContain('Provider actions');
+        expect(markup).toContain('Personal AI connections');
         expect(markup).toContain('request-123');
-        expect(markup).toContain('disabled');
-        expect(markup).toContain('disabled=""');
+        expect(markup).toContain('Add an OpenAI or Claude API key.');
+        expect(markup).toContain('Save connection');
+        expect(markup).toContain('No personal OpenAI or Claude connection is configured yet.');
     });
 });

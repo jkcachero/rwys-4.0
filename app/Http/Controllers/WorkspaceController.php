@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Inference\InferenceService;
+use App\Services\AIConnectionService;
 use App\Workspace\Services\WorkspaceReadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,6 +17,7 @@ class WorkspaceController extends Controller
     public function __construct(
         private readonly InferenceService $inference,
         private readonly WorkspaceReadService $reads,
+        private readonly AIConnectionService $connections,
     ) {}
 
     public function __invoke(Request $request): Response
@@ -76,12 +78,14 @@ class WorkspaceController extends Controller
                 'status' => $hasAvailableProvider ? 'available' : 'unavailable',
                 'message' => $hasAvailableProvider
                     ? 'Provider status is available for configured providers.'
-                    : 'Connect an eligible provider before requesting inference.',
+                    : 'Approved read providers are available. Personal AI connections are encrypted and owner-scoped.',
             ],
+            'connections' => $this->connections->listFor($request->user()),
             'providers' => $providers,
             'capabilities' => [
                 ['name' => 'AdKit read access', 'status' => 'ready'],
                 ['name' => 'Zernio read access', 'status' => 'ready'],
+                ['name' => 'Personal OpenAI / Claude connections', 'status' => 'available'],
                 ['name' => 'Provider actions', 'status' => 'approval_required'],
             ],
         ];

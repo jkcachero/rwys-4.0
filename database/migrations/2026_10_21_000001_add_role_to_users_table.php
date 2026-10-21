@@ -9,13 +9,14 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table): void {
-            $table->string('role')->default('user')->after('password');
+            $table->string('role')->default('user')->index();
         });
     }
 
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table): void {
+            $table->dropIndex(['role']);
             $table->dropColumn('role');
         });
     }

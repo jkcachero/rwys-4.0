@@ -1,8 +1,10 @@
 import WorkspaceController from './WorkspaceController'
+import AIConnectionController from './AIConnectionController'
 import Settings from './Settings'
 
 const Controllers = {
     WorkspaceController: Object.assign(WorkspaceController, WorkspaceController),
+    AIConnectionController: Object.assign(AIConnectionController, AIConnectionController),
     Settings: Object.assign(Settings, Settings),
 }
 

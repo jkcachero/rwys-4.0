@@ -1,0 +1,10 @@
+{
+  "name": "rwys-chatgpt-companion",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "login": "node server.mjs login",
+    "serve": "node server.mjs serve"
+  }
+}

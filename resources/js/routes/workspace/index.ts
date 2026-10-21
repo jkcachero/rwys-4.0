@@ -1,7 +1,8 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, type RouteFormDefinition } from './../../wayfinder'
+import connections from './connections'
 /**
 * @see \App\Http\Controllers\WorkspaceController::read
-* @see app/Http/Controllers/WorkspaceController.php:28
+* @see app/Http/Controllers/WorkspaceController.php:30
 * @route '/workspace/read'
 */
 export const read = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -16,7 +17,7 @@ read.definition = {
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::read
-* @see app/Http/Controllers/WorkspaceController.php:28
+* @see app/Http/Controllers/WorkspaceController.php:30
 * @route '/workspace/read'
 */
 read.url = (options?: RouteQueryOptions) => {
@@ -25,7 +26,7 @@ read.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::read
-* @see app/Http/Controllers/WorkspaceController.php:28
+* @see app/Http/Controllers/WorkspaceController.php:30
 * @route '/workspace/read'
 */
 read.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -35,7 +36,7 @@ read.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::read
-* @see app/Http/Controllers/WorkspaceController.php:28
+* @see app/Http/Controllers/WorkspaceController.php:30
 * @route '/workspace/read'
 */
 const readForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -45,7 +46,7 @@ const readForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => (
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::read
-* @see app/Http/Controllers/WorkspaceController.php:28
+* @see app/Http/Controllers/WorkspaceController.php:30
 * @route '/workspace/read'
 */
 readForm.post = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -57,6 +58,7 @@ read.form = readForm
 
 const workspace = {
     read: Object.assign(read, read),
+    connections: Object.assign(connections, connections),
 }
 
 export default workspace

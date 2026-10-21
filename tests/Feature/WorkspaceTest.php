@@ -26,7 +26,8 @@ class WorkspaceTest extends TestCase
             ->where('workspace.status', 'ready')
             ->where('workspace.provider.status', 'unavailable')
             ->where('workspace.capabilities.0.status', 'ready')
-            ->where('workspace.capabilities.2.status', 'approval_required')
+            ->where('workspace.capabilities.2.status', 'available')
+            ->where('workspace.connections', [])
             ->missing('workspace.user.email'));
     }
 
