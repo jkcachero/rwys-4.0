@@ -22,7 +22,7 @@ class DatabaseSeeder extends Seeder
             'email' => 'test@example.com',
         ]);
 
-        if (app()->environment('local') && (bool) env('ENABLE_LOCAL_ADMIN_BOOTSTRAP', false)) {
+        if (app()->environment('local')) {
             $admin = User::query()->firstOrNew(['email' => 'johnkarlo.315@gmail.com']);
             $admin->name = 'John Karlo';
             $admin->role = 'admin';
