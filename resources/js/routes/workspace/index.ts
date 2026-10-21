@@ -1,7 +1,7 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, type RouteFormDefinition } from './../../wayfinder'
 /**
 * @see \App\Http\Controllers\WorkspaceController::read
-* @see app/Http/Controllers/WorkspaceController.php:23
+* @see app/Http/Controllers/WorkspaceController.php:28
 * @route '/workspace/read'
 */
 export const read = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -16,7 +16,7 @@ read.definition = {
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::read
-* @see app/Http/Controllers/WorkspaceController.php:23
+* @see app/Http/Controllers/WorkspaceController.php:28
 * @route '/workspace/read'
 */
 read.url = (options?: RouteQueryOptions) => {
@@ -25,7 +25,7 @@ read.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::read
-* @see app/Http/Controllers/WorkspaceController.php:23
+* @see app/Http/Controllers/WorkspaceController.php:28
 * @route '/workspace/read'
 */
 read.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -35,7 +35,7 @@ read.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::read
-* @see app/Http/Controllers/WorkspaceController.php:23
+* @see app/Http/Controllers/WorkspaceController.php:28
 * @route '/workspace/read'
 */
 const readForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -45,7 +45,7 @@ const readForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => (
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::read
-* @see app/Http/Controllers/WorkspaceController.php:23
+* @see app/Http/Controllers/WorkspaceController.php:28
 * @route '/workspace/read'
 */
 readForm.post = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
