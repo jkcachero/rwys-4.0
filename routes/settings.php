@@ -31,8 +31,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('settings/appearance', 'settings/appearance')->name('appearance.edit');
 
     Route::get('settings/connections', [ProviderConnectionController::class, 'index'])->name('connections.edit');
-    Route::get('settings/connections/openai', [ProviderConnectionController::class, 'connectOpenAi'])->name('connections.openai');
-    Route::post('settings/connections/{provider}/test', [ProviderConnectionController::class, 'test'])->name('connections.test');
+    Route::post('settings/connections/openai', [ProviderConnectionController::class, 'connectOpenAi'])->middleware('throttle:6,1,openai-authorization')->name('connections.openai');
+    Route::get('settings/connections/openai/attempts/{state}', [ProviderConnectionController::class, 'attempt'])->where('state', '[A-Za-z0-9]{64}')->name('connections.attempt');
+    Route::post('settings/connections/{provider}/test', [ProviderConnectionController::class, 'test'])->middleware('throttle:6,1,connection-test')->name('connections.test');
     Route::delete('settings/connections/{provider}', [ProviderConnectionController::class, 'disconnect'])->name('connections.disconnect');
 });
 

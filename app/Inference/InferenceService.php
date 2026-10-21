@@ -8,5 +8,9 @@ interface InferenceService
 {
     public function status(User $user): array;
 
-    public function prompt(User $user, string $provider, string $prompt): InferenceResult;
+    /** @return list<array{slug: string, displayName: string, thinkingLevels: list<string>}> */
+    public function models(User $user, string $provider, ?int $connectionId = null, bool $refresh = false): array;
+
+    /** @param list<array{role: string, content: string}> $history Server-trusted conversation messages only. */
+    public function prompt(User $user, string $provider, string $prompt, ?int $connectionId = null, ?string $model = null, ?string $thinkingLevel = null, array $history = []): InferenceResult;
 }

@@ -16,12 +16,19 @@ final class FakeInferenceService implements InferenceService
             'name' => 'openai',
             'label' => 'OpenAI',
             'model' => 'fake-model',
-            'status' => 'available',
-            'message' => 'Ready for authenticated inference.',
+            'status' => 'unavailable',
+            'connected' => false,
+            'expiresAt' => null,
+            'message' => 'Simulated inference only; no live provider is connected.',
         ]];
     }
 
-    public function prompt(User $user, string $provider, string $prompt): InferenceResult
+    public function models(User $user, string $provider, ?int $connectionId = null, bool $refresh = false): array
+    {
+        return [['slug' => 'fake-model', 'displayName' => 'Simulated model', 'thinkingLevels' => []]];
+    }
+
+    public function prompt(User $user, string $provider, string $prompt, ?int $connectionId = null, ?string $model = null, ?string $thinkingLevel = null, array $history = []): InferenceResult
     {
         if ($this->failure instanceof RuntimeException) {
             throw $this->failure;

@@ -300,7 +300,7 @@ home.form = homeForm
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::__invoke
-* @see app/Http/Controllers/WorkspaceController.php:23
+* @see app/Http/Controllers/WorkspaceController.php:29
 * @route '/dashboard'
 */
 export const dashboard = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -315,7 +315,7 @@ dashboard.definition = {
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::__invoke
-* @see app/Http/Controllers/WorkspaceController.php:23
+* @see app/Http/Controllers/WorkspaceController.php:29
 * @route '/dashboard'
 */
 dashboard.url = (options?: RouteQueryOptions) => {
@@ -324,7 +324,7 @@ dashboard.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::__invoke
-* @see app/Http/Controllers/WorkspaceController.php:23
+* @see app/Http/Controllers/WorkspaceController.php:29
 * @route '/dashboard'
 */
 dashboard.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -334,7 +334,7 @@ dashboard.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::__invoke
-* @see app/Http/Controllers/WorkspaceController.php:23
+* @see app/Http/Controllers/WorkspaceController.php:29
 * @route '/dashboard'
 */
 dashboard.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -344,7 +344,7 @@ dashboard.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::__invoke
-* @see app/Http/Controllers/WorkspaceController.php:23
+* @see app/Http/Controllers/WorkspaceController.php:29
 * @route '/dashboard'
 */
 const dashboardForm = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -354,7 +354,7 @@ const dashboardForm = (options?: RouteQueryOptions): RouteFormDefinition<'get'> 
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::__invoke
-* @see app/Http/Controllers/WorkspaceController.php:23
+* @see app/Http/Controllers/WorkspaceController.php:29
 * @route '/dashboard'
 */
 dashboardForm.get = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -364,7 +364,7 @@ dashboardForm.get = (options?: RouteQueryOptions): RouteFormDefinition<'get'> =>
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::__invoke
-* @see app/Http/Controllers/WorkspaceController.php:23
+* @see app/Http/Controllers/WorkspaceController.php:29
 * @route '/dashboard'
 */
 dashboardForm.head = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -378,3 +378,84 @@ dashboardForm.head = (options?: RouteQueryOptions): RouteFormDefinition<'get'> =
 })
 
 dashboard.form = dashboardForm
+
+/**
+* @see \App\Http\Controllers\WorkspaceController::chat
+* @see app/Http/Controllers/WorkspaceController.php:36
+* @route '/chat'
+*/
+export const chat = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
+    url: chat.url(options),
+    method: 'get',
+})
+
+chat.definition = {
+    methods: ["get","head"],
+    url: '/chat',
+} satisfies RouteDefinition<["get","head"]>
+
+/**
+* @see \App\Http\Controllers\WorkspaceController::chat
+* @see app/Http/Controllers/WorkspaceController.php:36
+* @route '/chat'
+*/
+chat.url = (options?: RouteQueryOptions) => {
+    return chat.definition.url + queryParams(options)
+}
+
+/**
+* @see \App\Http\Controllers\WorkspaceController::chat
+* @see app/Http/Controllers/WorkspaceController.php:36
+* @route '/chat'
+*/
+chat.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
+    url: chat.url(options),
+    method: 'get',
+})
+
+/**
+* @see \App\Http\Controllers\WorkspaceController::chat
+* @see app/Http/Controllers/WorkspaceController.php:36
+* @route '/chat'
+*/
+chat.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
+    url: chat.url(options),
+    method: 'head',
+})
+
+/**
+* @see \App\Http\Controllers\WorkspaceController::chat
+* @see app/Http/Controllers/WorkspaceController.php:36
+* @route '/chat'
+*/
+const chatForm = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
+    action: chat.url(options),
+    method: 'get',
+})
+
+/**
+* @see \App\Http\Controllers\WorkspaceController::chat
+* @see app/Http/Controllers/WorkspaceController.php:36
+* @route '/chat'
+*/
+chatForm.get = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
+    action: chat.url(options),
+    method: 'get',
+})
+
+/**
+* @see \App\Http\Controllers\WorkspaceController::chat
+* @see app/Http/Controllers/WorkspaceController.php:36
+* @route '/chat'
+*/
+chatForm.head = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
+    action: chat.url({
+        [options?.mergeQuery ? 'mergeQuery' : 'query']: {
+            _method: 'HEAD',
+            ...(options?.query ?? options?.mergeQuery ?? {}),
+        }
+    }),
+    method: 'get',
+})
+
+chat.form = chatForm
