@@ -41,8 +41,18 @@ export default function Dashboard({ workspace }: { workspace: Workspace }) {
     const [question, setQuestion] = useState('');
     const [provider, setProvider] = useState('adkit');
     const [messages, setMessages] = useState(workspace.conversation.messages);
+    const [connections, setConnections] = useState(workspace.connections);
+    const [connectionProvider, setConnectionProvider] = useState('openai');
+    const [connectionLabel, setConnectionLabel] = useState('');
+    const [connectionApiKey, setConnectionApiKey] = useState('');
+    const [connectionModel, setConnectionModel] = useState('');
     const [loading, setLoading] = useState(false);
+    const [connectionLoading, setConnectionLoading] = useState(false);
     const [error, setError] = useState('');
+    const [connectionError, setConnectionError] = useState('');
+
+    const csrfToken = () =>
+        document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 
     const submit = () => {
         if (!question.trim()) return;
@@ -52,10 +62,7 @@ export default function Dashboard({ workspace }: { workspace: Workspace }) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN':
-                    document
-                        .querySelector('meta[name="csrf-token"]')
-                        ?.getAttribute('content') ?? '',
+                'X-CSRF-TOKEN': csrfToken(),
             },
             body: JSON.stringify({ provider, scopeId: 'default', question }),
         })
@@ -70,6 +77,67 @@ export default function Dashboard({ workspace }: { workspace: Workspace }) {
             })
             .catch((requestError: Error) => setError(requestError.message))
             .finally(() => setLoading(false));
+    };
+
+    const saveConnection = () => {
+        if (!connectionLabel.trim() || !connectionApiKey.trim()) {
+            setConnectionError('Enter a label and API key.');
+            return;
+        }
+
+        setConnectionLoading(true);
+        setConnectionError('');
+        fetch('/workspace/connections', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken(),
+            },
+            body: JSON.stringify({
+                provider: connectionProvider,
+                authMode: 'api_key',
+                label: connectionLabel,
+                apiKey: connectionApiKey,
+                model: connectionModel || null,
+            }),
+        })
+            .then(async (response) => {
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.message ?? 'The connection could not be saved.');
+                }
+                return data;
+            })
+            .then((data) => {
+                setConnections((current) => [
+                    ...current.filter((connection) => connection.id !== data.connection.id),
+                    data.connection,
+                ]);
+                setConnectionLabel('');
+                setConnectionApiKey('');
+                setConnectionModel('');
+            })
+            .catch((requestError: Error) => setConnectionError(requestError.message))
+            .finally(() => setConnectionLoading(false));
+    };
+
+    const revokeConnection = (connectionId: number) => {
+        setConnectionLoading(true);
+        setConnectionError('');
+        fetch(`/workspace/connections/${connectionId}`, {
+            method: 'DELETE',
+            headers: { 'X-CSRF-TOKEN': csrfToken() },
+        })
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error('The connection could not be revoked.');
+                }
+                setConnections((current) =>
+                    current.filter((connection) => connection.id !== connectionId),
+                );
+            })
+            .catch((requestError: Error) => setConnectionError(requestError.message))
+            .finally(() => setConnectionLoading(false));
     };
 
     return (
@@ -205,19 +273,68 @@ export default function Dashboard({ workspace }: { workspace: Workspace }) {
                     <CardHeader>
                         <CardTitle>Personal AI connections</CardTitle>
                         <CardDescription>
-                            Connections are encrypted on the server and visible only to your account.
+                            Add an OpenAI or Claude API key. Keys are encrypted on the server and visible only to your account.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-2">
-                        {workspace.connections.length === 0 ? (
+                    <CardContent className="space-y-4">
+                        <div className="grid gap-3 md:grid-cols-2">
+                            <select
+                                aria-label="AI provider"
+                                className="rounded-md border bg-background px-3 py-2 text-sm"
+                                value={connectionProvider}
+                                onChange={(event) => setConnectionProvider(event.target.value)}
+                            >
+                                <option value="openai">OpenAI</option>
+                                <option value="claude">Claude</option>
+                            </select>
+                            <input
+                                aria-label="Connection label"
+                                className="rounded-md border bg-background px-3 py-2 text-sm"
+                                placeholder="Label, e.g. Personal"
+                                value={connectionLabel}
+                                onChange={(event) => setConnectionLabel(event.target.value)}
+                            />
+                            <input
+                                aria-label="API key"
+                                className="rounded-md border bg-background px-3 py-2 text-sm md:col-span-2"
+                                placeholder="Paste your API key"
+                                type="password"
+                                value={connectionApiKey}
+                                onChange={(event) => setConnectionApiKey(event.target.value)}
+                            />
+                            <input
+                                aria-label="Model (optional)"
+                                className="rounded-md border bg-background px-3 py-2 text-sm"
+                                placeholder="Model (optional)"
+                                value={connectionModel}
+                                onChange={(event) => setConnectionModel(event.target.value)}
+                            />
+                            <Button onClick={saveConnection} disabled={connectionLoading}>
+                                {connectionLoading ? 'Saving…' : 'Save connection'}
+                            </Button>
+                        </div>
+                        {connectionError && (
+                            <p className="text-sm text-destructive">{connectionError}</p>
+                        )}
+                        {connections.length === 0 ? (
                             <p className="text-sm text-muted-foreground">
                                 No personal OpenAI or Claude connection is configured yet.
                             </p>
                         ) : (
-                            workspace.connections.map((connection) => (
-                                <div className="flex items-center justify-between rounded-md border p-3 text-sm" key={connection.id}>
-                                    <span>{connection.provider} · {connection.label}</span>
-                                    <Badge variant="secondary">{connection.status}</Badge>
+                            connections.map((connection) => (
+                                <div className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm" key={connection.id}>
+                                    <div>
+                                        <span>{connection.provider} · {connection.label}</span>
+                                        <Badge className="ml-2" variant="secondary">{connection.status}</Badge>
+                                    </div>
+                                    <Button
+                                        disabled={connectionLoading}
+                                        onClick={() => revokeConnection(connection.id)}
+                                        size="sm"
+                                        variant="outline"
+                                    >
+                                        Revoke
+                                    </Button>
                                 </div>
                             ))
                         )}

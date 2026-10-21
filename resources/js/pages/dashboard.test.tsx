@@ -35,6 +35,8 @@ describe('Dashboard workspace', () => {
         expect(markup).toContain('No messages yet');
         expect(markup).toContain('Personal AI connections');
         expect(markup).toContain('request-123');
+        expect(markup).toContain('Add an OpenAI or Claude API key.');
+        expect(markup).toContain('Save connection');
         expect(markup).toContain('No personal OpenAI or Claude connection is configured yet.');
     });
 });
