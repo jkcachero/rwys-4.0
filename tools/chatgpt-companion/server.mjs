@@ -9,15 +9,18 @@ const storePath = process.env.CHATGPT_COMPANION_STORE;
 const keyPath = process.env.CHATGPT_COMPANION_KEY;
 const proxyToken = process.env.CHATGPT_COMPANION_PROXY_TOKEN ?? randomBytes(32).toString('base64url');
 const discoveryUrl = `${ISSUER}/.well-known/openid-configuration`;
+const deviceSessions = new Map();
 
-const jsonResponse = (response, status, body) => {
+const jsonResponse = (response, status, body, headers = {}) => {
     const payload = JSON.stringify(body);
     response.writeHead(status, {
+        'access-control-allow-credentials': 'true',
         'access-control-allow-headers': 'authorization, content-type',
         'access-control-allow-methods': 'GET, POST, OPTIONS',
         'access-control-allow-origin': process.env.CHATGPT_COMPANION_ALLOWED_ORIGIN ?? 'null',
         'cache-control': 'no-store',
         'content-type': 'application/json',
+        ...headers,
     });
     response.end(payload);
 };
@@ -119,21 +122,103 @@ async function currentConnection(provider) {
     return connection;
 }
 
-function requireProxyToken(request) {
-    return request.headers.authorization === `Bearer ${proxyToken}`;
+function requestToken(request) {
+    const authorization = request.headers.authorization;
+    if (authorization === `Bearer ${proxyToken}`) return true;
+    return request.headers.cookie?.split(';').some((cookie) => cookie.trim() === `rwys_companion_token=${proxyToken}`) ?? false;
+}
+
+async function requestDeviceCode() {
+    const response = await fetch(`${ISSUER}/api/accounts/deviceauth/usercode`, {
+        method: 'POST',
+        headers: { accept: 'application/json', 'content-type': 'application/json' },
+        body: JSON.stringify({ client_id: 'dynamic_agent_client' }),
+    });
+    const data = await response.json();
+    if (!response.ok || typeof data.user_code !== 'string' || typeof data.device_auth_id !== 'string') {
+        throw new Error(data.error_description ?? 'ChatGPT device sign-in could not be started.');
+    }
+    return data;
+}
+
+async function pollDeviceCode(session) {
+    const response = await fetch(`${ISSUER}/api/accounts/deviceauth/token`, {
+        method: 'POST',
+        headers: { accept: 'application/json', 'content-type': 'application/json' },
+        body: JSON.stringify({
+            device_auth_id: session.deviceAuthId,
+            user_code: session.userCode,
+        }),
+    });
+    const data = await response.json();
+    if (response.status === 403 || data.status === 'pending') return { status: 'pending' };
+    if (!response.ok || typeof data.authorization_code !== 'string' || typeof data.code_verifier !== 'string') {
+        throw new Error(data.error_description ?? 'ChatGPT device authorization failed.');
+    }
+    const pending = createPendingAuthorization({
+        clientId: 'dynamic_agent_client',
+        hostId: session.hostId,
+        redirectUri: `${ISSUER}/deviceauth/callback`,
+    });
+    pending.verifier = data.code_verifier;
+    const connection = await exchangeCode({
+        tokenEndpoint: session.provider.token_endpoint,
+        issuer: session.provider.issuer,
+        jwksUri: session.provider.jwks_uri,
+        pending,
+        code: data.authorization_code,
+        clientId: 'dynamic_agent_client',
+    });
+    await saveConnection(connection, storePath, keyPath);
+    return { status: 'connected', connection: { hostId: connection.hostId, expiresAt: connection.expiresAt } };
 }
 
 async function serve() {
     const server = createServer(async (request, response) => {
         if (request.method === 'OPTIONS') {
-            jsonResponse(response, 204, {});
-            return;
-        }
-        if (!requireProxyToken(request)) {
-            jsonResponse(response, 401, { error: 'Companion authorization is required.' });
+            jsonResponse(response, 204, {}, { 'access-control-allow-origin': request.headers.origin ?? 'null' });
             return;
         }
         try {
+            if (request.method === 'POST' && request.url === '/v1/chatgpt/login') {
+                const device = await requestDeviceCode();
+                const sessionId = randomBytes(18).toString('base64url');
+                const provider = await discover();
+                deviceSessions.set(sessionId, {
+                    deviceAuthId: device.device_auth_id,
+                    expiresAt: Date.now() + Number(device.expires_in ?? 900) * 1000,
+                    hostId: configuredHostId ?? randomBytes(16).toString('hex'),
+                    provider,
+                    userCode: device.user_code,
+                });
+                jsonResponse(response, 200, {
+                    expiresIn: Number(device.expires_in ?? 900),
+                    sessionId,
+                    userCode: device.user_code,
+                    verificationUrl: device.verification_url ?? `${ISSUER}/codex/device`,
+                }, {
+                    'access-control-allow-origin': request.headers.origin ?? 'null',
+                    'set-cookie': `rwys_companion_token=${proxyToken}; HttpOnly; SameSite=Lax; Path=/; Max-Age=900`,
+                });
+                return;
+            }
+            if (request.method === 'GET' && request.url?.startsWith('/v1/chatgpt/login/')) {
+                const sessionId = request.url.split('/').pop();
+                const session = deviceSessions.get(sessionId);
+                if (!session || session.expiresAt < Date.now()) {
+                    deviceSessions.delete(sessionId);
+                    jsonResponse(response, 410, { error: 'This ChatGPT sign-in request expired.' });
+                    return;
+                }
+                const result = await pollDeviceCode(session);
+                if (result.status === 'connected') deviceSessions.delete(sessionId);
+                jsonResponse(response, 200, result, { 'access-control-allow-origin': request.headers.origin ?? 'null' });
+                return;
+            }
+            if (!requestToken(request)) {
+                jsonResponse(response, 401, { error: 'Companion authorization is required.' });
+                return;
+            }
             if (request.method === 'GET' && request.url === '/v1/chatgpt/status') {
                 const connection = await loadConnection(storePath, keyPath);
                 jsonResponse(response, 200, { connected: true, hostId: connection.hostId, expiresAt: connection.expiresAt });
