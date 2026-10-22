@@ -25,7 +25,11 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->dontFlash([
+            'apiKey', 'api_key', 'access_token', 'refresh_token', 'id_token', 'client_secret',
+            'accessToken', 'refreshToken', 'idToken', 'clientSecret', 'credentials', 'code',
+        ]);
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
+            fn (Request $request) => $request->is('api/*', 'workspace/connections', 'workspace/connections/*', 'dashboard/prompt') || $request->expectsJson(),
         );
     })->create();

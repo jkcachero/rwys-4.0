@@ -12,7 +12,9 @@ class AIConnectionService
     /** @return array<int, array<string, mixed>> */
     public function listFor(User $user): array
     {
-        return $user->aiConnections()->latest()->get()->map(fn (AIConnection $connection): array => $connection->redacted())->all();
+        return $user->aiConnections()->latest()->get([
+            'id', 'provider', 'label', 'auth_mode', 'model', 'status', 'last_validated_at',
+        ])->map(fn (AIConnection $connection): array => $connection->redacted())->all();
     }
 
     /** @param array<string, mixed> $data */
@@ -30,8 +32,8 @@ class AIConnectionService
                 'auth_mode' => $data['authMode'],
                 'credentials' => ['api_key' => $apiKey],
                 'model' => $data['model'] ?? null,
-                'status' => 'active',
-                'last_validated_at' => now(),
+                'status' => 'configured',
+                'last_validated_at' => null,
             ],
         ));
     }
@@ -39,6 +41,6 @@ class AIConnectionService
     public function revoke(User $user, AIConnection $connection): void
     {
         abort_unless($connection->user_id === $user->id, 404);
-        $connection->update(['status' => 'revoked']);
+        $connection->update(['status' => 'revoked', 'credentials' => []]);
     }
 }

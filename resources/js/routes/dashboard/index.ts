@@ -1,7 +1,7 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, type RouteFormDefinition } from './../../wayfinder'
 /**
 * @see \App\Http\Controllers\WorkspaceController::prompt
-* @see app/Http/Controllers/WorkspaceController.php:49
+* @see app/Http/Controllers/WorkspaceController.php:135
 * @route '/dashboard/prompt'
 */
 export const prompt = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -16,7 +16,7 @@ prompt.definition = {
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::prompt
-* @see app/Http/Controllers/WorkspaceController.php:49
+* @see app/Http/Controllers/WorkspaceController.php:135
 * @route '/dashboard/prompt'
 */
 prompt.url = (options?: RouteQueryOptions) => {
@@ -25,7 +25,7 @@ prompt.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::prompt
-* @see app/Http/Controllers/WorkspaceController.php:49
+* @see app/Http/Controllers/WorkspaceController.php:135
 * @route '/dashboard/prompt'
 */
 prompt.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -35,7 +35,7 @@ prompt.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::prompt
-* @see app/Http/Controllers/WorkspaceController.php:49
+* @see app/Http/Controllers/WorkspaceController.php:135
 * @route '/dashboard/prompt'
 */
 const promptForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -45,7 +45,7 @@ const promptForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> =>
 
 /**
 * @see \App\Http\Controllers\WorkspaceController::prompt
-* @see app/Http/Controllers/WorkspaceController.php:49
+* @see app/Http/Controllers/WorkspaceController.php:135
 * @route '/dashboard/prompt'
 */
 promptForm.post = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
