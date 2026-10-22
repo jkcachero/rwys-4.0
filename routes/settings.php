@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Settings\AgentAccessController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\ProviderConnectionController;
 use App\Http\Controllers\Settings\SecurityController;
@@ -34,6 +35,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('settings/connections/openai', [ProviderConnectionController::class, 'connectOpenAi'])->name('connections.openai');
     Route::post('settings/connections/{provider}/test', [ProviderConnectionController::class, 'test'])->name('connections.test');
     Route::delete('settings/connections/{provider}', [ProviderConnectionController::class, 'disconnect'])->name('connections.disconnect');
+
+    Route::get('settings/agent-access', [AgentAccessController::class, 'edit'])->name('settings.agent-access.edit');
+
+    Route::middleware(RequirePassword::class)->group(function () {
+        Route::patch('settings/agent-access/{client}/permissions/{permission}', [AgentAccessController::class, 'updatePermission'])
+            ->name('settings.agent-access.permissions.update');
+        Route::post('settings/agent-access/{client}/tokens', [AgentAccessController::class, 'storeToken'])
+            ->name('settings.agent-access.tokens.store');
+        Route::post('settings/agent-access/{client}/tokens/{token}/rotate', [AgentAccessController::class, 'rotateToken'])
+            ->name('settings.agent-access.tokens.rotate');
+        Route::delete('settings/agent-access/{client}/tokens/{token}', [AgentAccessController::class, 'destroyToken'])
+            ->name('settings.agent-access.tokens.destroy');
+    });
 });
 
 Route::get('auth/callback', [ProviderConnectionController::class, 'callback'])->name('connections.callback');

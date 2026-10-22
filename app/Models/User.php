@@ -7,6 +7,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -38,15 +39,15 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
-    /** @return HasMany<Client, $this> */
-    public function clients(): HasMany
-    {
-        return $this->hasMany(Client::class);
-    }
-
     public function aiConnections(): HasMany
     {
         return $this->hasMany(AIConnection::class);
+    }
+
+    /** @return BelongsToMany<Client, $this> */
+    public function clients(): BelongsToMany
+    {
+        return $this->belongsToMany(Client::class)->withPivot(['role', 'is_active'])->withTimestamps();
     }
 
     public function isAdmin(): bool

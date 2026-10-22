@@ -39,4 +39,15 @@ return [
         'ai_driver' => env('WORKSPACE_AI_DRIVER', 'fake'),
     ],
 
+    'zernio' => [
+        'enabled' => env('ZERNIO_AGENT_API_ENABLED', false),
+        'publish_enabled' => env('ZERNIO_AGENT_PUBLISH_ENABLED', false),
+        'schedule_enabled' => env('ZERNIO_AGENT_SCHEDULE_ENABLED', false),
+        'base_url' => env('ZERNIO_API_BASE_URL', 'https://zernio.com/api'),
+        'webhook_secret' => env('ZERNIO_WEBHOOK_SECRET'),
+        'connect_timeout' => 5,
+        'timeout' => 15,
+        'max_response_bytes' => 1_048_576,
+    ],
+
 ];
