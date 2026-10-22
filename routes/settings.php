@@ -8,6 +8,9 @@ use Illuminate\Auth\Middleware\RequirePassword;
 /* @end-chisel-password-confirmation */
 use Illuminate\Support\Facades\Route;
 
+require __DIR__.'/agent-settings.php';
+require __DIR__.'/provider-account-assignments.php';
+
 Route::middleware(['auth'])->group(function () {
     Route::redirect('settings', '/settings/profile');
 

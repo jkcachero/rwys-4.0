@@ -1,0 +1,1687 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "RWYS External Agent API",
+        "version": "1.0.0",
+        "description": "Current bounded API: eleven operations on ten paths. RWYS is a thin, scoped Zernio bridge: clients need only a RWYS bearer token; provider credentials stay server-side. Operators separately assign a Zernio profile exclusively to one Client and explicitly import/sync its connected accounts into local mappings. Account scope requires a materialized mapping linked to that Client's owned provider/environment/profile; new remote connections require explicit operator sync. No generic proxy or admin bypass; all targets must validate against current Client/account scope. Profile assignment/sync is session-only and does not enable publishing or mint an owner token. Unknown query/body fields are rejected; files are accepted only by the scheduled Instagram multipart route. GET requests accept no body. All responses carry X-Request-ID and Cache-Control: no-store, private; JSON bodies carry the same request_id. Read admission defaults to 60/minute and write admission to 6/minute, enforced for both Client and token through the database, with at most two in-flight requests per Client and a 120-second admission lease. Provider calls have a 15-second timeout and no automatic retry. Zernio, publishing and Instagram scheduling flags all default false. Immediate text publishing on four platforms and single-JPEG Instagram scheduling are separately opt-in. Narrow single-post analytics is supported, not universal live metrics. AdKit remains blocked; broader media, analytics, draft creation, and scheduling expansion remain pending. Schema examples are fictional. The operator guides separately record one approved Instagram image published through RWYS on 2026-10-22, with no second create; that evidence does not verify other platforms, analytics, AdKit or deployment. Temporary token revoked and write gates restored off; original read token unchanged."
+    },
+    "externalDocs": {
+        "description": "Official Zernio documentation. Upstream contract: https://zernio.com/openapi.yaml version 1.331.1, checked 2026-10-22.",
+        "url": "https://docs.zernio.com"
+    },
+    "servers": [
+        {
+            "url": "/",
+            "description": "Use the actual browser origin or approved APP_URL; no host is assumed."
+        }
+    ],
+    "security": [{ "rwysToken": [] }],
+    "paths": {
+        "/api/v1/context": {
+            "get": {
+                "operationId": "getAgentContext",
+                "summary": "Read the authenticated client context",
+                "description": "Local read with no provider calls. Returns the bound client ID and currently available capabilities. Accepts no query or body fields.",
+                "x-required-ability": "context.read",
+                "x-reject-unknown-inputs": true,
+                "responses": {
+                    "200": {
+                        "description": "Current client context",
+                        "headers": {
+                            "X-Request-ID": {
+                                "$ref": "#/components/headers/RequestId"
+                            },
+                            "Cache-Control": {
+                                "$ref": "#/components/headers/NoStore"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ContextResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Error401" },
+                    "403": { "$ref": "#/components/responses/Error403" },
+                    "422": { "$ref": "#/components/responses/Error422" },
+                    "429": { "$ref": "#/components/responses/Error429" },
+                    "503": { "$ref": "#/components/responses/Error503" }
+                }
+            }
+        },
+        "/api/v1/capabilities": {
+            "get": {
+                "operationId": "getAgentCapabilities",
+                "summary": "Discover currently available abilities",
+                "description": "Local read with no provider calls. Abilities reflect token grants, current active production mappings linked to the Client's exclusively owned profiles, and server gates, not provider connectivity. Remote connections not yet materialized by explicit operator profile sync do not grant account access. AdKit remains blocked. Accepts no query or body fields.",
+                "x-required-ability": "context.read",
+                "x-reject-unknown-inputs": true,
+                "responses": {
+                    "200": {
+                        "description": "Current capabilities",
+                        "headers": {
+                            "X-Request-ID": {
+                                "$ref": "#/components/headers/RequestId"
+                            },
+                            "Cache-Control": {
+                                "$ref": "#/components/headers/NoStore"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CapabilitiesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Error401" },
+                    "403": { "$ref": "#/components/responses/Error403" },
+                    "422": { "$ref": "#/components/responses/Error422" },
+                    "429": { "$ref": "#/components/responses/Error429" },
+                    "503": { "$ref": "#/components/responses/Error503" }
+                }
+            }
+        },
+        "/api/v1/zernio/accounts": {
+            "get": {
+                "operationId": "listAgentAccounts",
+                "summary": "List authorized local account mappings",
+                "description": "Returns only active materialized Zernio production account mappings linked to a profile exclusively owned by the token's Client and allowed by its account scope. Operators assign profiles, not individual accounts; new remote connections appear only after explicit profile account sync. Unrestricted account scope includes current and future eligible imported mappings; explicit allowed-account IDs and token abilities are not widened by sync. No provider calls or automatic sync; nevertheless returns 503 when the provider is disabled or unconfigured. Mapping status is not live connectivity. Accepts only page and limit, no body.",
+                "x-required-ability": "zernio.accounts.read",
+                "x-reject-unknown-inputs": true,
+                "parameters": [
+                    { "$ref": "#/components/parameters/Page" },
+                    { "$ref": "#/components/parameters/Limit" }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Safe local mappings",
+                        "headers": {
+                            "X-Request-ID": {
+                                "$ref": "#/components/headers/RequestId"
+                            },
+                            "Cache-Control": {
+                                "$ref": "#/components/headers/NoStore"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AccountsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Error401" },
+                    "403": { "$ref": "#/components/responses/Error403" },
+                    "422": { "$ref": "#/components/responses/Error422" },
+                    "429": { "$ref": "#/components/responses/Error429" },
+                    "503": { "$ref": "#/components/responses/Error503" }
+                }
+            }
+        },
+        "/api/v1/zernio/accounts/{account}/status": {
+            "get": {
+                "operationId": "getAgentAccountStatus",
+                "summary": "Check exact mapped account connectivity",
+                "description": "Uses the server-owned mapping. At most three provider account-list GETs of 25 records, matching exact profile, account, and platform. Returns safe 404 if not proven within that bound. Accepts no query or body fields.",
+                "x-required-ability": "zernio.accounts.read",
+                "x-reject-unknown-inputs": true,
+                "parameters": [{ "$ref": "#/components/parameters/Account" }],
+                "responses": {
+                    "200": {
+                        "description": "Observed connection state",
+                        "headers": {
+                            "X-Request-ID": {
+                                "$ref": "#/components/headers/RequestId"
+                            },
+                            "Cache-Control": {
+                                "$ref": "#/components/headers/NoStore"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/StatusResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Error401" },
+                    "403": { "$ref": "#/components/responses/Error403" },
+                    "404": { "$ref": "#/components/responses/Error404" },
+                    "422": { "$ref": "#/components/responses/Error422" },
+                    "429": { "$ref": "#/components/responses/Error429" },
+                    "502": { "$ref": "#/components/responses/Error502" },
+                    "503": { "$ref": "#/components/responses/Error503" }
+                }
+            }
+        },
+        "/api/v1/zernio/accounts/{account}/posts": {
+            "get": {
+                "operationId": "listAgentPosts",
+                "summary": "Read one scoped provider post page",
+                "description": "One provider GET using the server-owned mapping. Every target must have a current authorized mapping in the same profile. Unauthorized mixed-target posts are filtered; totals describe the provider page, not visible authorized totals. complete is true only on page 1 with at most one provider page and no filtering. Accepts only page and limit, no body.",
+                "x-required-ability": "zernio.posts.read",
+                "x-reject-unknown-inputs": true,
+                "parameters": [
+                    { "$ref": "#/components/parameters/Account" },
+                    { "$ref": "#/components/parameters/Page" },
+                    { "$ref": "#/components/parameters/Limit" }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "One filtered provider page",
+                        "headers": {
+                            "X-Request-ID": {
+                                "$ref": "#/components/headers/RequestId"
+                            },
+                            "Cache-Control": {
+                                "$ref": "#/components/headers/NoStore"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PostsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Error401" },
+                    "403": { "$ref": "#/components/responses/Error403" },
+                    "404": { "$ref": "#/components/responses/Error404" },
+                    "422": { "$ref": "#/components/responses/Error422" },
+                    "429": { "$ref": "#/components/responses/Error429" },
+                    "502": { "$ref": "#/components/responses/Error502" },
+                    "503": { "$ref": "#/components/responses/Error503" }
+                }
+            },
+            "post": {
+                "operationId": "publishAgentTextPost",
+                "summary": "Publish one immediate text-only post",
+                "description": "Explicit write access required. Only content is accepted. LinkedIn: 3000 characters; Facebook: 63206; Threads: 500; Bluesky: 300. Nonblank UTF-8 text, excluding forbidden control characters. Server-owned account, profile, platform and immediate publication cannot be overridden. At most three preflight account GETs plus one publishing POST, four provider calls total. The adapter publish method itself sends only POST. Durable deduplication is by Client, capability and hashed Idempotency-Key; identical replay returns the same operation without resending, changed immutable intent returns 409. Nonterminal states, including unknown, return 202; terminal states return 200, which does not by itself mean succeeded. Never use a fresh key to resolve an ambiguous result. Provider 207 is ambiguous and may save a private recovery candidate; that candidate is not public provider_post_id. Preflight failures are represented by a failed operation rather than a provider error response. Accepts no query fields or files.",
+                "x-required-ability": "zernio.posts.publish",
+                "x-reject-unknown-inputs": true,
+                "parameters": [
+                    { "$ref": "#/components/parameters/Account" },
+                    { "$ref": "#/components/parameters/IdempotencyKey" }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PublishInput"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PublishInput"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Terminal operation, inspect state",
+                        "headers": {
+                            "X-Request-ID": {
+                                "$ref": "#/components/headers/RequestId"
+                            },
+                            "Cache-Control": {
+                                "$ref": "#/components/headers/NoStore"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResponse"
+                                }
+                            }
+                        }
+                    },
+                    "202": {
+                        "description": "Nonterminal operation; poll locally without resending",
+                        "headers": {
+                            "X-Request-ID": {
+                                "$ref": "#/components/headers/RequestId"
+                            },
+                            "Cache-Control": {
+                                "$ref": "#/components/headers/NoStore"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Error401" },
+                    "403": { "$ref": "#/components/responses/Error403" },
+                    "404": { "$ref": "#/components/responses/Error404" },
+                    "409": { "$ref": "#/components/responses/Error409" },
+                    "422": { "$ref": "#/components/responses/Error422" },
+                    "429": { "$ref": "#/components/responses/Error429" },
+                    "503": { "$ref": "#/components/responses/Error503" }
+                }
+            }
+        },
+        "/api/v1/zernio/accounts/{account}/scheduled-posts": {
+            "post": {
+                "operationId": "scheduleAgentInstagramImage",
+                "summary": "Schedule one Instagram feed JPEG",
+                "description": "Route agent-api.posts.schedule is a write requiring zernio.posts.schedule, not a default read grant. Requires all three server flags (AGENT_ZERNIO_ENABLED, AGENT_ZERNIO_PUBLISHING_ENABLED, AGENT_ZERNIO_INSTAGRAM_SCHEDULING_ENABLED), an active owned Instagram production mapping with publishing_enabled, and current owner/token/account scope. Only multipart/form-data with content, scheduled_for and image is accepted; no query fields, arbitrary URLs, profile/account/platform identity, draft or immediate-publication flags. A NEW intent must be 2 minutes to 24 hours ahead; immediately before POST the server rechecks at least 60 seconds remain, never falling back to immediate publication. At most three account preflight GETs plus one fixed-host multipart POST /v1/media/upload-direct and one POST /v1/posts: five calls at 15 seconds each, at most 75 network seconds, not a whole-request wall-clock guarantee. Unattached temporary uploads expire after 7 days; attaching to a post copies the asset to permanent media storage (https://docs.zernio.com/guides/media-uploads.mdx). Hosting supports 4.5 MB; this app permits only JPEG bytes up to 2 MiB. MIME, headers/dimensions and SOI/EOI checks are not full bitmap decoding; malformed JPEG data may still be rejected by the provider. No untrusted URL source is fetched or provider secret forwarded to third-party hosts. Client/capability/hashed-key deduplication is permanent: frozen mapping, caption, exact schedule, actual file SHA-256, size and MIME define immutable intent, excluding filename. Identical authorized replays return the original operation even after its original deadline without upload/create; changes return 409. Encrypted execution metadata is persisted before create. Ambiguous upload or create stops at unknown, never resends; absence of a recovery candidate requires operator investigation. Acceptance requires exact caption, validated media identity, UTC time and one pending Instagram target with root scheduled, yielding provider_pending, not published. Media URL comparison requires exact equality except strict HTTPS media.zernio.com /temp/ to /media/ promotion with the identical ASCII basename [A-Za-z0-9_-]{1,251}.jpg and no query, fragment, credentials, ports, encoding or traversal. This narrow comparator does not fetch/hash media or change the source URL/frozen intent. Independent matching-hash CDN evidence corroborated identity for the one completed live image; do not generalize it to arbitrary URL changes. Read-only reconciliation validates media privately using exact post/scoped list evidence; scheduled evidence reads may continue after write flags/account publishing revocation while provider read configuration, active Client, profile ownership and mapping remain valid. Only root and target published plus a native HTTPS Instagram post URL prove succeeded. The route returns only a safe operation summary, never the upload URL. Preflight/provider failures generally become failed/unknown operations, not raw upstream errors. 202 is nonterminal; 200 is terminal, not necessarily succeeded. One approved live Instagram image succeeded through read-only candidate recovery without a second create; see the operator guides. Manual samples do not authorize another post.",
+                "x-required-ability": "zernio.posts.schedule",
+                "x-reject-unknown-inputs": true,
+                "parameters": [
+                    { "$ref": "#/components/parameters/Account" },
+                    { "$ref": "#/components/parameters/IdempotencyKey" }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ScheduleInstagramInput"
+                            },
+                            "encoding": {
+                                "image": { "contentType": "image/jpeg" }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Terminal original operation, inspect state; not necessarily published",
+                        "headers": {
+                            "X-Request-ID": {
+                                "$ref": "#/components/headers/RequestId"
+                            },
+                            "Cache-Control": {
+                                "$ref": "#/components/headers/NoStore"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResponse"
+                                }
+                            }
+                        }
+                    },
+                    "202": {
+                        "description": "Nonterminal operation; provider_pending confirms scheduling acceptance only, not publication",
+                        "headers": {
+                            "X-Request-ID": {
+                                "$ref": "#/components/headers/RequestId"
+                            },
+                            "Cache-Control": {
+                                "$ref": "#/components/headers/NoStore"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Error401" },
+                    "403": { "$ref": "#/components/responses/Error403" },
+                    "404": { "$ref": "#/components/responses/Error404" },
+                    "409": { "$ref": "#/components/responses/Error409" },
+                    "413": { "$ref": "#/components/responses/Error413" },
+                    "422": { "$ref": "#/components/responses/Error422" },
+                    "429": { "$ref": "#/components/responses/Error429" },
+                    "502": { "$ref": "#/components/responses/Error502" },
+                    "503": { "$ref": "#/components/responses/Error503" }
+                },
+                "externalDocs": {
+                    "description": "Current create-post semantics, including past-time immediate publication. Also see https://docs.zernio.com/platforms/instagram.mdx; cached OpenAPI 1.331.1 inspected 2026-10-22. RWYS intentionally exposes a narrower contract.",
+                    "url": "https://docs.zernio.com/posts/create-post.mdx"
+                }
+            }
+        },
+        "/api/v1/zernio/accounts/{account}/posts/{post}": {
+            "get": {
+                "operationId": "getAgentPost",
+                "summary": "Read an authorized exact post",
+                "description": "One exact provider GET. Observed profile membership and every target must be authorized. If detail omits membership, at most three scoped list GETs of 25 posts can prove access: a 75-post horizon, four calls total. A safe 404 outside that horizon is not universal proof of absence. Accepts no query or body fields.",
+                "x-required-ability": "zernio.posts.read",
+                "x-reject-unknown-inputs": true,
+                "parameters": [
+                    { "$ref": "#/components/parameters/Account" },
+                    { "$ref": "#/components/parameters/Post" }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Authorized normalized post",
+                        "headers": {
+                            "X-Request-ID": {
+                                "$ref": "#/components/headers/RequestId"
+                            },
+                            "Cache-Control": {
+                                "$ref": "#/components/headers/NoStore"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PostResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Error401" },
+                    "403": { "$ref": "#/components/responses/Error403" },
+                    "404": { "$ref": "#/components/responses/Error404" },
+                    "422": { "$ref": "#/components/responses/Error422" },
+                    "429": { "$ref": "#/components/responses/Error429" },
+                    "502": { "$ref": "#/components/responses/Error502" },
+                    "503": { "$ref": "#/components/responses/Error503" }
+                }
+            }
+        },
+        "/api/v1/zernio/accounts/{account}/posts/{post}/analytics": {
+            "get": {
+                "operationId": "getAgentPostAnalytics",
+                "summary": "Read scoped single-post analytics, including likes when available",
+                "description": "Requires zernio.analytics.read. One provider GET /v1/analytics with postId and server-pinned profileId/accountId, not a generic proxy. Accepts Zernio Post IDs and Zernio ExternalPost record IDs, both constrained locally to 24 lowercase hexadecimal characters; arbitrary native platform post IDs are not supported by this RWYS interface. This local constraint is not a claim about the full upstream string schema. No query or body fields. Every returned target must have a current authorized mapping in the same Client/profile and token account scope; no admin bypass. Internal profile_id is not returned. Metrics preserve documented Zernio camelCase fields only, all optional: likes is an integer when present, measured zero differs from missing/unsupported, and the entire analytics object can be null. Values are fetched/cached by Zernio; lastUpdated is their freshness timestamp, not a promise of live universal metrics. Personal LinkedIn analytics is limited to posts published through Zernio; platform support varies. HTTP 202 means sync pending; 424 means all platforms failed. Both use the data envelope and are not claims of successful metrics. HTTP 402 is a sanitized analytics_access_required error. Existing tokens are not automatically granted this new ability; rotation preserves rights, so create a fresh approved scope.",
+                "x-required-ability": "zernio.analytics.read",
+                "x-reject-unknown-inputs": true,
+                "parameters": [
+                    { "$ref": "#/components/parameters/Account" },
+                    { "$ref": "#/components/parameters/AnalyticsPost" }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Scoped analytics snapshot; inspect sync_status and optional metrics",
+                        "headers": {
+                            "X-Request-ID": {
+                                "$ref": "#/components/headers/RequestId"
+                            },
+                            "Cache-Control": {
+                                "$ref": "#/components/headers/NoStore"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AnalyticsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "202": {
+                        "description": "Sync pending, data envelope rather than completed metric success",
+                        "headers": {
+                            "X-Request-ID": {
+                                "$ref": "#/components/headers/RequestId"
+                            },
+                            "Cache-Control": {
+                                "$ref": "#/components/headers/NoStore"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AnalyticsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "424": {
+                        "description": "All platforms failed, data envelope rather than successful analytics",
+                        "headers": {
+                            "X-Request-ID": {
+                                "$ref": "#/components/headers/RequestId"
+                            },
+                            "Cache-Control": {
+                                "$ref": "#/components/headers/NoStore"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AnalyticsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Error401" },
+                    "402": { "$ref": "#/components/responses/Error402" },
+                    "403": { "$ref": "#/components/responses/Error403" },
+                    "404": { "$ref": "#/components/responses/Error404" },
+                    "422": { "$ref": "#/components/responses/Error422" },
+                    "429": { "$ref": "#/components/responses/Error429" },
+                    "502": { "$ref": "#/components/responses/Error502" },
+                    "503": { "$ref": "#/components/responses/Error503" }
+                }
+            }
+        },
+        "/api/v1/operations": {
+            "get": {
+                "operationId": "listAgentOperations",
+                "summary": "Read local operation history with a bounded cursor",
+                "description": "No provider calls or reconciliation. Only operations whose current active production mapping and token grants still match are visible. Ascending UUID order, exclusive after cursor, at most limit plus one rows fetched. Accepts only limit and after, never page or total. No total count is returned. complete is true only without after and without more rows. Accepts no body.",
+                "x-required-ability": "operations.read",
+                "x-reject-unknown-inputs": true,
+                "parameters": [
+                    { "$ref": "#/components/parameters/Limit" },
+                    { "$ref": "#/components/parameters/After" }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Local cursor page",
+                        "headers": {
+                            "X-Request-ID": {
+                                "$ref": "#/components/headers/RequestId"
+                            },
+                            "Cache-Control": {
+                                "$ref": "#/components/headers/NoStore"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Error401" },
+                    "403": { "$ref": "#/components/responses/Error403" },
+                    "422": { "$ref": "#/components/responses/Error422" },
+                    "429": { "$ref": "#/components/responses/Error429" },
+                    "503": { "$ref": "#/components/responses/Error503" }
+                }
+            }
+        },
+        "/api/v1/operations/{operation}": {
+            "get": {
+                "operationId": "getAgentOperation",
+                "summary": "Poll a local operation without provider reads",
+                "description": "No provider calls, no resend, and no reconciliation. Current mapping and token scope must still authorize the operation; otherwise safe 404. Raw intent, result, hashes, leases and private recovery candidates are not exposed. Accepts no query or body fields.",
+                "x-required-ability": "operations.read",
+                "x-reject-unknown-inputs": true,
+                "parameters": [{ "$ref": "#/components/parameters/Operation" }],
+                "responses": {
+                    "200": {
+                        "description": "Safe operation state",
+                        "headers": {
+                            "X-Request-ID": {
+                                "$ref": "#/components/headers/RequestId"
+                            },
+                            "Cache-Control": {
+                                "$ref": "#/components/headers/NoStore"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Error401" },
+                    "403": { "$ref": "#/components/responses/Error403" },
+                    "404": { "$ref": "#/components/responses/Error404" },
+                    "422": { "$ref": "#/components/responses/Error422" },
+                    "429": { "$ref": "#/components/responses/Error429" },
+                    "503": { "$ref": "#/components/responses/Error503" }
+                }
+            }
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "rwysToken": { "type": "http", "scheme": "bearer" }
+        },
+        "headers": {
+            "RequestId": {
+                "description": "Server-generated correlation UUID, identical to the JSON request_id on success and error.",
+                "schema": { "type": "string", "format": "uuid" }
+            },
+            "NoStore": {
+                "description": "Responses must not be stored.",
+                "schema": { "type": "string", "const": "no-store, private" }
+            },
+            "RetryAfter": {
+                "description": "Wait 60 seconds before retrying admission; do not resend an ambiguous publication with a new key.",
+                "schema": { "type": "string", "const": "60" }
+            }
+        },
+        "parameters": {
+            "Account": {
+                "name": "account",
+                "in": "path",
+                "required": true,
+                "description": "Positive local account mapping ID returned by account listing, serialized as decimal digits without leading zeroes; not a provider account or profile ID. The materialized mapping must remain linked to a profile exclusively owned by the token's Client and within its account scope.",
+                "schema": { "type": "string", "pattern": "^[1-9][0-9]*$" }
+            },
+            "AnalyticsPost": {
+                "name": "post",
+                "in": "path",
+                "required": true,
+                "description": "Zernio Post ID or Zernio ExternalPost record ID, locally constrained to exactly 24 lowercase hexadecimal characters. Not an arbitrary native platform post ID. This is the bounded RWYS interface, not a limitation inferred from the broader upstream string schema. Fictional examples, not live IDs.",
+                "schema": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{24}$",
+                    "examples": [
+                        "cccccccccccccccccccccccc",
+                        "eeeeeeeeeeeeeeeeeeeeeeee"
+                    ]
+                }
+            },
+            "Post": {
+                "name": "post",
+                "in": "path",
+                "required": true,
+                "description": "Exact post ID; fictional example, not a live ID.",
+                "schema": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{24}$",
+                    "examples": ["cccccccccccccccccccccccc"]
+                }
+            },
+            "Operation": {
+                "name": "operation",
+                "in": "path",
+                "required": true,
+                "description": "Local operation UUID.",
+                "schema": { "type": "string", "format": "uuid" }
+            },
+            "Page": {
+                "name": "page",
+                "in": "query",
+                "description": "Bounded page number.",
+                "schema": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000,
+                    "default": 1
+                }
+            },
+            "Limit": {
+                "name": "limit",
+                "in": "query",
+                "description": "Maximum page size.",
+                "schema": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "default": 25
+                }
+            },
+            "After": {
+                "name": "after",
+                "in": "query",
+                "description": "Exclusive operation UUID cursor; pass next_cursor only while has_more is true.",
+                "schema": { "type": "string", "format": "uuid" }
+            },
+            "IdempotencyKey": {
+                "name": "Idempotency-Key",
+                "in": "header",
+                "required": true,
+                "description": "One immutable publication intent; 1-255 visible ASCII characters, no spaces. Retain across ambiguous responses and token rotation.",
+                "schema": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "pattern": "^[\\x21-\\x7e]{1,255}$"
+                }
+            }
+        },
+        "schemas": {
+            "RequestId": {
+                "type": "string",
+                "format": "uuid",
+                "examples": ["019a0b00-0000-7000-8000-000000000001"]
+            },
+            "ProviderId": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{24}$",
+                "description": "Fictional examples are not live IDs.",
+                "examples": ["aaaaaaaaaaaaaaaaaaaaaaaa"]
+            },
+            "NullableDate": {
+                "type": ["string", "null"],
+                "format": "date-time",
+                "examples": [null, "2026-10-22T12:00:00.000000Z"]
+            },
+            "Capabilities": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["abilities", "zernio", "adkit"],
+                "properties": {
+                    "abilities": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "context.read",
+                                "zernio.accounts.read",
+                                "zernio.posts.read",
+                                "zernio.analytics.read",
+                                "operations.read",
+                                "zernio.posts.publish",
+                                "zernio.posts.schedule"
+                            ]
+                        }
+                    },
+                    "zernio": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["read_enabled", "write_enabled"],
+                        "properties": {
+                            "read_enabled": {
+                                "type": "boolean",
+                                "description": "Includes analytics-only grants when the provider is configured/enabled and current authorized mappings exist. Local capability discovery is not a live connectivity or analytics subscription check."
+                            },
+                            "write_enabled": {
+                                "type": "boolean",
+                                "description": "True when a granted publish or schedule ability is currently eligible under its platform, owned mapping and server gates. Local discovery, not provider connectivity."
+                            }
+                        }
+                    },
+                    "adkit": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["status", "reason"],
+                        "properties": {
+                            "status": { "type": "string", "const": "blocked" },
+                            "reason": {
+                                "type": "string",
+                                "const": "Not implemented."
+                            }
+                        }
+                    }
+                },
+                "examples": [
+                    {
+                        "abilities": ["context.read", "operations.read"],
+                        "zernio": {
+                            "read_enabled": false,
+                            "write_enabled": false
+                        },
+                        "adkit": {
+                            "status": "blocked",
+                            "reason": "Not implemented."
+                        }
+                    }
+                ]
+            },
+            "Account": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "id",
+                    "provider",
+                    "environment",
+                    "platform",
+                    "status",
+                    "write_enabled"
+                ],
+                "properties": {
+                    "id": { "type": "integer", "minimum": 1 },
+                    "provider": { "type": "string", "const": "zernio" },
+                    "environment": { "type": "string", "const": "production" },
+                    "platform": { "type": "string" },
+                    "status": {
+                        "type": "string",
+                        "enum": ["mapped", "inactive"]
+                    },
+                    "write_enabled": { "type": "boolean" }
+                },
+                "examples": [
+                    {
+                        "id": 1,
+                        "provider": "zernio",
+                        "environment": "production",
+                        "platform": "linkedin",
+                        "status": "mapped",
+                        "write_enabled": false
+                    }
+                ]
+            },
+            "Operation": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "id",
+                    "client_id",
+                    "client_account_id",
+                    "capability",
+                    "state",
+                    "provider_post_id",
+                    "created_at",
+                    "updated_at",
+                    "last_reconciled_at"
+                ],
+                "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "client_id": { "type": "integer", "minimum": 1 },
+                    "client_account_id": { "type": "integer", "minimum": 1 },
+                    "capability": {
+                        "type": "string",
+                        "enum": [
+                            "zernio.posts.publish",
+                            "zernio.posts.schedule"
+                        ]
+                    },
+                    "state": {
+                        "type": "string",
+                        "enum": [
+                            "pending",
+                            "executing",
+                            "provider_pending",
+                            "partial",
+                            "unknown",
+                            "succeeded",
+                            "failed",
+                            "cancelled"
+                        ]
+                    },
+                    "provider_post_id": {
+                        "type": ["string", "null"],
+                        "pattern": "^[a-f0-9]{24}$",
+                        "description": "Verified provider post identifier only; private recovery candidates are not exposed."
+                    },
+                    "created_at": {
+                        "$ref": "#/components/schemas/NullableDate"
+                    },
+                    "updated_at": {
+                        "$ref": "#/components/schemas/NullableDate"
+                    },
+                    "last_reconciled_at": {
+                        "$ref": "#/components/schemas/NullableDate"
+                    }
+                },
+                "examples": [
+                    {
+                        "id": "019a0b00-0000-7000-8000-000000000002",
+                        "client_id": 1,
+                        "client_account_id": 1,
+                        "capability": "zernio.posts.publish",
+                        "state": "unknown",
+                        "provider_post_id": null,
+                        "created_at": "2026-10-22T12:00:00.000000Z",
+                        "updated_at": "2026-10-22T12:00:00.000000Z",
+                        "last_reconciled_at": null
+                    },
+                    {
+                        "id": "019a0b00-0000-7000-8000-000000000003",
+                        "client_id": 1,
+                        "client_account_id": 1,
+                        "capability": "zernio.posts.schedule",
+                        "state": "provider_pending",
+                        "provider_post_id": "cccccccccccccccccccccccc",
+                        "created_at": "2026-10-22T12:00:00.000000Z",
+                        "updated_at": "2026-10-22T12:00:00.000000Z",
+                        "last_reconciled_at": null
+                    }
+                ]
+            },
+            "Post": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "id",
+                    "profile_id",
+                    "content",
+                    "status",
+                    "scheduled_for",
+                    "created_at",
+                    "updated_at",
+                    "platforms"
+                ],
+                "properties": {
+                    "id": { "$ref": "#/components/schemas/ProviderId" },
+                    "profile_id": {
+                        "type": ["string", "null"],
+                        "pattern": "^[a-f0-9]{24}$"
+                    },
+                    "content": {
+                        "type": ["string", "null"],
+                        "description": "Normalized provider text, at most 300000 UTF-8 bytes."
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "draft",
+                            "scheduled",
+                            "publishing",
+                            "published",
+                            "partial",
+                            "failed",
+                            "cancelled"
+                        ]
+                    },
+                    "scheduled_for": {
+                        "$ref": "#/components/schemas/NullableDate"
+                    },
+                    "created_at": {
+                        "$ref": "#/components/schemas/NullableDate"
+                    },
+                    "updated_at": {
+                        "$ref": "#/components/schemas/NullableDate"
+                    },
+                    "platforms": {
+                        "type": "array",
+                        "items": { "$ref": "#/components/schemas/PostTarget" }
+                    }
+                },
+                "examples": [
+                    {
+                        "id": "cccccccccccccccccccccccc",
+                        "profile_id": "aaaaaaaaaaaaaaaaaaaaaaaa",
+                        "content": "Fictional example text",
+                        "status": "published",
+                        "scheduled_for": null,
+                        "created_at": null,
+                        "updated_at": null,
+                        "platforms": [
+                            {
+                                "account_id": "bbbbbbbbbbbbbbbbbbbbbbbb",
+                                "platform": "linkedin",
+                                "status": "published",
+                                "url": null
+                            }
+                        ]
+                    }
+                ]
+            },
+            "PostTarget": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["account_id", "platform", "status", "url"],
+                "properties": {
+                    "account_id": { "$ref": "#/components/schemas/ProviderId" },
+                    "platform": {
+                        "type": "string",
+                        "enum": [
+                            "tiktok",
+                            "instagram",
+                            "facebook",
+                            "youtube",
+                            "linkedin",
+                            "twitter",
+                            "threads",
+                            "pinterest",
+                            "reddit",
+                            "bluesky",
+                            "googlebusiness",
+                            "telegram",
+                            "snapchat",
+                            "discord",
+                            "slack",
+                            "whatsapp",
+                            "shopify",
+                            "wordpress",
+                            "wix",
+                            "linkedinads",
+                            "metaads",
+                            "pinterestads",
+                            "tiktokads",
+                            "xads",
+                            "googleads",
+                            "openaiads",
+                            "redditads",
+                            "sms",
+                            "phone",
+                            "rcs",
+                            "whopads",
+                            "hubspot",
+                            "webflow"
+                        ]
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "pending",
+                            "processing",
+                            "uploading",
+                            "published",
+                            "failed",
+                            "cancelled"
+                        ]
+                    },
+                    "url": {
+                        "type": ["string", "null"],
+                        "format": "uri",
+                        "maxLength": 4096,
+                        "description": "HTTP(S) URL without embedded credentials, or null."
+                    }
+                }
+            },
+            "PostAnalytics": {
+                "type": ["object", "null"],
+                "additionalProperties": false,
+                "description": "Optional documented Zernio camelCase fields only. Null means the whole object is unavailable; absent metrics are not measured zero. Platform coverage and semantics vary. Zernio-fetched/cached metrics, not universal live values; lastUpdated indicates freshness. All examples are fictional test values.",
+                "properties": {
+                    "impressions": { "type": "integer" },
+                    "reach": { "type": "integer" },
+                    "likes": { "type": "integer" },
+                    "comments": { "type": "integer" },
+                    "shares": { "type": "integer" },
+                    "saves": { "type": "integer" },
+                    "clicks": { "type": "integer" },
+                    "views": { "type": "integer" },
+                    "follows": { "type": ["integer", "null"] },
+                    "igReelsAvgWatchTime": { "type": "integer" },
+                    "igReelsVideoViewTotalTime": { "type": "integer" },
+                    "reelsSkipRate": { "type": "number" },
+                    "completionRate": { "type": "number" },
+                    "profileViews": { "type": "integer" },
+                    "websiteClicks": { "type": "integer" },
+                    "impressionSources": {
+                        "type": "object",
+                        "additionalProperties": { "type": "number" }
+                    },
+                    "audienceTypes": {
+                        "type": "object",
+                        "additionalProperties": { "type": "number" }
+                    },
+                    "audienceCountries": {
+                        "type": "object",
+                        "additionalProperties": { "type": "number" }
+                    },
+                    "replays": { "type": "integer" },
+                    "retentionCurve": {
+                        "type": "object",
+                        "additionalProperties": { "type": "number" }
+                    },
+                    "reposts": { "type": "integer" },
+                    "videoDurationSeconds": { "type": ["integer", "null"] },
+                    "engagementRate": { "type": "number" },
+                    "lastUpdated": { "type": "string", "format": "date-time" }
+                },
+                "examples": [
+                    null,
+                    { "likes": 0, "lastUpdated": "2026-10-22T12:00:00Z" },
+                    { "views": 7 }
+                ]
+            },
+            "PlatformAnalytics": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "account_id",
+                    "platform",
+                    "status",
+                    "sync_status",
+                    "analytics",
+                    "error_code",
+                    "is_owner"
+                ],
+                "properties": {
+                    "account_id": { "type": "string" },
+                    "platform": { "type": "string" },
+                    "status": {
+                        "type": "string",
+                        "enum": ["published", "failed"]
+                    },
+                    "sync_status": {
+                        "type": "string",
+                        "enum": ["synced", "pending", "unavailable"]
+                    },
+                    "analytics": {
+                        "$ref": "#/components/schemas/PostAnalytics"
+                    },
+                    "error_code": {
+                        "type": ["string", "null"],
+                        "description": "Safe machine-readable code, not a raw provider error message."
+                    },
+                    "is_owner": { "type": ["boolean", "null"] }
+                }
+            },
+            "PostAnalyticsData": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "post_id",
+                    "zernio_post_id",
+                    "status",
+                    "sync_status",
+                    "analytics",
+                    "platform_analytics",
+                    "upstream_status",
+                    "source"
+                ],
+                "properties": {
+                    "post_id": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{24}$",
+                        "description": "Zernio Post or ExternalPost record ID, not a native platform post ID."
+                    },
+                    "zernio_post_id": {
+                        "type": ["string", "null"],
+                        "pattern": "^[a-f0-9]{24}$",
+                        "description": "Zernio Post ID from upstream latePostId, or null."
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "draft",
+                            "scheduled",
+                            "publishing",
+                            "published",
+                            "partial",
+                            "failed",
+                            "cancelled"
+                        ]
+                    },
+                    "sync_status": {
+                        "type": "string",
+                        "enum": ["synced", "pending", "partial", "unavailable"]
+                    },
+                    "analytics": {
+                        "$ref": "#/components/schemas/PostAnalytics"
+                    },
+                    "platform_analytics": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PlatformAnalytics"
+                        }
+                    },
+                    "upstream_status": {
+                        "type": "integer",
+                        "enum": [200, 202, 424]
+                    },
+                    "source": { "type": "string", "const": "zernio" }
+                }
+            },
+            "AnalyticsResponse": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["data", "request_id"],
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/PostAnalyticsData"
+                    },
+                    "request_id": { "$ref": "#/components/schemas/RequestId" }
+                },
+                "examples": [
+                    {
+                        "data": {
+                            "post_id": "cccccccccccccccccccccccc",
+                            "zernio_post_id": null,
+                            "status": "published",
+                            "sync_status": "synced",
+                            "analytics": { "likes": 0 },
+                            "platform_analytics": [
+                                {
+                                    "account_id": "bbbbbbbbbbbbbbbbbbbbbbbb",
+                                    "platform": "linkedin",
+                                    "status": "published",
+                                    "sync_status": "synced",
+                                    "analytics": { "likes": 0 },
+                                    "error_code": null,
+                                    "is_owner": null
+                                }
+                            ],
+                            "upstream_status": 200,
+                            "source": "zernio"
+                        },
+                        "request_id": "019a0b00-0000-7000-8000-000000000001"
+                    },
+                    {
+                        "data": {
+                            "post_id": "cccccccccccccccccccccccc",
+                            "zernio_post_id": null,
+                            "status": "published",
+                            "sync_status": "pending",
+                            "analytics": null,
+                            "platform_analytics": [
+                                {
+                                    "account_id": "bbbbbbbbbbbbbbbbbbbbbbbb",
+                                    "platform": "linkedin",
+                                    "status": "published",
+                                    "sync_status": "pending",
+                                    "analytics": null,
+                                    "error_code": null,
+                                    "is_owner": null
+                                }
+                            ],
+                            "upstream_status": 202,
+                            "source": "zernio"
+                        },
+                        "request_id": "019a0b00-0000-7000-8000-000000000001"
+                    },
+                    {
+                        "data": {
+                            "post_id": "eeeeeeeeeeeeeeeeeeeeeeee",
+                            "zernio_post_id": null,
+                            "status": "failed",
+                            "sync_status": "unavailable",
+                            "analytics": null,
+                            "platform_analytics": [
+                                {
+                                    "account_id": "bbbbbbbbbbbbbbbbbbbbbbbb",
+                                    "platform": "linkedin",
+                                    "status": "failed",
+                                    "sync_status": "unavailable",
+                                    "analytics": null,
+                                    "error_code": "post_not_found",
+                                    "is_owner": null
+                                }
+                            ],
+                            "upstream_status": 424,
+                            "source": "zernio"
+                        },
+                        "request_id": "019a0b00-0000-7000-8000-000000000001"
+                    }
+                ]
+            },
+            "ScheduleInstagramInput": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["content", "scheduled_for", "image"],
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2200,
+                        "pattern": "^[^\\p{Cc}]+$",
+                        "description": "Nonblank valid UTF-8 caption. All Unicode control characters, including tabs and newlines, are rejected."
+                    },
+                    "scheduled_for": {
+                        "type": "string",
+                        "format": "date-time",
+                        "minLength": 20,
+                        "maxLength": 20,
+                        "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+                        "description": "Exact valid UTC YYYY-MM-DDTHH:mm:ssZ, no offsets/fractions. NEW intent: 2 minutes through 24 hours ahead. Recheck at least 60 seconds before provider create; past times never become immediate posts. Identical authorized replay retains this original timestamp after its deadline."
+                    },
+                    "image": {
+                        "type": "string",
+                        "format": "binary",
+                        "minLength": 1,
+                        "maxLength": 2097152,
+                        "description": "Required uploaded JPEG actual bytes, not a URL or base64 string. At most 2 MiB (2097152 bytes), width and height each 1..4096, at most 16000000 pixels, width/height aspect ratio 0.5625..1.91 inclusive. MIME and JPEG image metadata are validated independently of filename; filename is not part of immutable intent."
+                    }
+                }
+            },
+            "PublishInput": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["content"],
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 63206,
+                        "pattern": "^[^\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f]+$",
+                        "description": "Nonblank UTF-8. Platform-specific character limits: linkedin 3000, facebook 63206, threads 500, bluesky 300. Newline, carriage return and tab are allowed."
+                    }
+                },
+                "examples": [{ "content": "Operator-approved text example" }]
+            },
+            "PagePagination": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "page",
+                    "limit",
+                    "total",
+                    "pages",
+                    "has_more",
+                    "complete"
+                ],
+                "properties": {
+                    "page": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                    },
+                    "total": { "type": "integer", "minimum": 0 },
+                    "pages": { "type": "integer", "minimum": 0 },
+                    "has_more": { "type": "boolean" },
+                    "complete": {
+                        "type": "boolean",
+                        "description": "Page 1 and at most one page."
+                    }
+                }
+            },
+            "PostPagination": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "page",
+                    "limit",
+                    "total",
+                    "pages",
+                    "has_more",
+                    "complete",
+                    "scope",
+                    "filtered"
+                ],
+                "properties": {
+                    "page": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                    },
+                    "total": { "type": "integer", "minimum": 0 },
+                    "pages": { "type": "integer", "minimum": 0 },
+                    "has_more": { "type": "boolean" },
+                    "complete": {
+                        "type": "boolean",
+                        "description": "Page 1, at most one provider page, and no filtering."
+                    },
+                    "scope": { "type": "string", "const": "provider_page" },
+                    "filtered": { "type": "boolean" }
+                }
+            },
+            "CursorPagination": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["limit", "has_more", "next_cursor", "complete"],
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                    },
+                    "has_more": { "type": "boolean" },
+                    "next_cursor": {
+                        "type": ["string", "null"],
+                        "format": "uuid"
+                    },
+                    "complete": {
+                        "type": "boolean",
+                        "description": "True only without after and without more rows."
+                    }
+                },
+                "examples": [
+                    {
+                        "limit": 25,
+                        "has_more": false,
+                        "next_cursor": null,
+                        "complete": true
+                    }
+                ]
+            },
+            "ContextResponse": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["data", "request_id"],
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["client", "capabilities"],
+                        "properties": {
+                            "client": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["id"],
+                                "properties": {
+                                    "id": { "type": "integer", "minimum": 1 }
+                                }
+                            },
+                            "capabilities": {
+                                "$ref": "#/components/schemas/Capabilities"
+                            }
+                        }
+                    },
+                    "request_id": { "$ref": "#/components/schemas/RequestId" }
+                }
+            },
+            "CapabilitiesResponse": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["data", "request_id"],
+                "properties": {
+                    "data": { "$ref": "#/components/schemas/Capabilities" },
+                    "request_id": { "$ref": "#/components/schemas/RequestId" }
+                }
+            },
+            "AccountsResponse": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["data", "pagination", "request_id"],
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": { "$ref": "#/components/schemas/Account" }
+                    },
+                    "pagination": {
+                        "$ref": "#/components/schemas/PagePagination"
+                    },
+                    "request_id": { "$ref": "#/components/schemas/RequestId" }
+                }
+            },
+            "StatusResponse": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["data", "request_id"],
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["id", "status"],
+                        "properties": {
+                            "id": { "type": "integer", "minimum": 1 },
+                            "status": {
+                                "type": "string",
+                                "enum": ["connected", "disconnected"]
+                            }
+                        }
+                    },
+                    "request_id": { "$ref": "#/components/schemas/RequestId" }
+                }
+            },
+            "PostsResponse": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["data", "pagination", "request_id"],
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": { "$ref": "#/components/schemas/Post" }
+                    },
+                    "pagination": {
+                        "$ref": "#/components/schemas/PostPagination"
+                    },
+                    "request_id": { "$ref": "#/components/schemas/RequestId" }
+                }
+            },
+            "PostResponse": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["data", "request_id"],
+                "properties": {
+                    "data": { "$ref": "#/components/schemas/Post" },
+                    "request_id": { "$ref": "#/components/schemas/RequestId" }
+                }
+            },
+            "OperationsResponse": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["data", "pagination", "request_id"],
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": { "$ref": "#/components/schemas/Operation" }
+                    },
+                    "pagination": {
+                        "$ref": "#/components/schemas/CursorPagination"
+                    },
+                    "request_id": { "$ref": "#/components/schemas/RequestId" }
+                }
+            },
+            "OperationResponse": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["data", "request_id"],
+                "properties": {
+                    "data": { "$ref": "#/components/schemas/Operation" },
+                    "request_id": { "$ref": "#/components/schemas/RequestId" }
+                }
+            },
+            "Error": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["error", "request_id"],
+                "properties": {
+                    "error": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["code", "message"],
+                        "properties": {
+                            "code": {
+                                "type": "string",
+                                "enum": [
+                                    "unauthenticated",
+                                    "analytics_access_required",
+                                    "forbidden",
+                                    "not_found",
+                                    "idempotency_conflict",
+                                    "invalid_input",
+                                    "rate_limited",
+                                    "provider_unavailable",
+                                    "service_unavailable",
+                                    "request_failed"
+                                ]
+                            },
+                            "message": { "type": "string" }
+                        }
+                    },
+                    "request_id": { "$ref": "#/components/schemas/RequestId" }
+                }
+            }
+        },
+        "responses": {
+            "Error401": {
+                "description": "Missing, invalid, revoked, expired, improperly scoped or inactive-client token; session authentication is insufficient.",
+                "headers": {
+                    "X-Request-ID": {
+                        "$ref": "#/components/headers/RequestId"
+                    },
+                    "Cache-Control": { "$ref": "#/components/headers/NoStore" }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": { "$ref": "#/components/schemas/Error" },
+                        "example": {
+                            "error": {
+                                "code": "unauthenticated",
+                                "message": "Unauthenticated."
+                            },
+                            "request_id": "019a0b00-0000-7000-8000-000000000001"
+                        }
+                    }
+                }
+            },
+            "Error402": {
+                "description": "Zernio analytics access required. Sanitized; no billing details, credentials or upstream body.",
+                "headers": {
+                    "X-Request-ID": {
+                        "$ref": "#/components/headers/RequestId"
+                    },
+                    "Cache-Control": { "$ref": "#/components/headers/NoStore" }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": { "$ref": "#/components/schemas/Error" },
+                        "example": {
+                            "error": {
+                                "code": "analytics_access_required",
+                                "message": "Analytics access required."
+                            },
+                            "request_id": "019a0b00-0000-7000-8000-000000000001"
+                        }
+                    }
+                }
+            },
+            "Error403": {
+                "description": "Required ability missing or publication not authorized/enabled.",
+                "headers": {
+                    "X-Request-ID": {
+                        "$ref": "#/components/headers/RequestId"
+                    },
+                    "Cache-Control": { "$ref": "#/components/headers/NoStore" }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": { "$ref": "#/components/schemas/Error" },
+                        "example": {
+                            "error": {
+                                "code": "forbidden",
+                                "message": "Forbidden."
+                            },
+                            "request_id": "019a0b00-0000-7000-8000-000000000001"
+                        }
+                    }
+                }
+            },
+            "Error404": {
+                "description": "Invalid, absent or unauthorized selector, changed mapping, or membership not proven within bounded reads. Does not prove global provider absence.",
+                "headers": {
+                    "X-Request-ID": {
+                        "$ref": "#/components/headers/RequestId"
+                    },
+                    "Cache-Control": { "$ref": "#/components/headers/NoStore" }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": { "$ref": "#/components/schemas/Error" },
+                        "example": {
+                            "error": {
+                                "code": "not_found",
+                                "message": "Not found."
+                            },
+                            "request_id": "019a0b00-0000-7000-8000-000000000001"
+                        }
+                    }
+                }
+            },
+            "Error409": {
+                "description": "Idempotency key conflicts with immutable intent, or mapping changed during publication.",
+                "headers": {
+                    "X-Request-ID": {
+                        "$ref": "#/components/headers/RequestId"
+                    },
+                    "Cache-Control": { "$ref": "#/components/headers/NoStore" }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": { "$ref": "#/components/schemas/Error" },
+                        "example": {
+                            "error": {
+                                "code": "idempotency_conflict",
+                                "message": "Idempotency conflict."
+                            },
+                            "request_id": "019a0b00-0000-7000-8000-000000000001"
+                        }
+                    }
+                }
+            },
+            "Error413": {
+                "description": "Request exceeds PHP/application body limits. Laravel-rendered 413 uses request_failed; an upstream proxy can reject before Laravel and is not guaranteed to use this JSON envelope. JPEG validation failures normally return 422.",
+                "headers": {
+                    "X-Request-ID": {
+                        "$ref": "#/components/headers/RequestId"
+                    },
+                    "Cache-Control": { "$ref": "#/components/headers/NoStore" }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": { "$ref": "#/components/schemas/Error" },
+                        "example": {
+                            "error": {
+                                "code": "request_failed",
+                                "message": "Request failed."
+                            },
+                            "request_id": "019a0b00-0000-7000-8000-000000000001"
+                        }
+                    }
+                }
+            },
+            "Error422": {
+                "description": "Unknown query/body fields, unsupported files, invalid pagination/cursor, content, schedule, JPEG or missing/invalid Idempotency-Key. Validation details are not exposed.",
+                "headers": {
+                    "X-Request-ID": {
+                        "$ref": "#/components/headers/RequestId"
+                    },
+                    "Cache-Control": { "$ref": "#/components/headers/NoStore" }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": { "$ref": "#/components/schemas/Error" },
+                        "example": {
+                            "error": {
+                                "code": "invalid_input",
+                                "message": "Invalid input."
+                            },
+                            "request_id": "019a0b00-0000-7000-8000-000000000001"
+                        }
+                    }
+                }
+            },
+            "Error429": {
+                "description": "Client or token read/write budget exhausted, or two Client requests remain in flight. Retry-After is 60 seconds.",
+                "headers": {
+                    "X-Request-ID": {
+                        "$ref": "#/components/headers/RequestId"
+                    },
+                    "Cache-Control": { "$ref": "#/components/headers/NoStore" },
+                    "Retry-After": { "$ref": "#/components/headers/RetryAfter" }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": { "$ref": "#/components/schemas/Error" },
+                        "example": {
+                            "error": {
+                                "code": "rate_limited",
+                                "message": "Rate limited."
+                            },
+                            "request_id": "019a0b00-0000-7000-8000-000000000001"
+                        }
+                    }
+                }
+            },
+            "Error502": {
+                "description": "Provider read failed or returned malformed, out-of-scope, oversized or otherwise unsafe data. Provider credentials and raw response are not returned.",
+                "headers": {
+                    "X-Request-ID": {
+                        "$ref": "#/components/headers/RequestId"
+                    },
+                    "Cache-Control": { "$ref": "#/components/headers/NoStore" }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": { "$ref": "#/components/schemas/Error" },
+                        "example": {
+                            "error": {
+                                "code": "provider_unavailable",
+                                "message": "Provider unavailable."
+                            },
+                            "request_id": "019a0b00-0000-7000-8000-000000000001"
+                        }
+                    }
+                }
+            },
+            "Error503": {
+                "description": "Service unavailable, including disabled/unconfigured provider reads or unexpected internal failure. No internal details are exposed.",
+                "headers": {
+                    "X-Request-ID": {
+                        "$ref": "#/components/headers/RequestId"
+                    },
+                    "Cache-Control": { "$ref": "#/components/headers/NoStore" }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": { "$ref": "#/components/schemas/Error" },
+                        "example": {
+                            "error": {
+                                "code": "service_unavailable",
+                                "message": "Service unavailable."
+                            },
+                            "request_id": "019a0b00-0000-7000-8000-000000000001"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

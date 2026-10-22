@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
 
+require __DIR__.'/agent-api.php';
+
 Route::post('/sanctum/token', function (Request $request) {
     $request->validate([
         'email' => ['required', 'email'],

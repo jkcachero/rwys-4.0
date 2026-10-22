@@ -31,10 +31,19 @@ const sidebarNavItems: NavItem[] = [
         href: '/settings/connections',
         icon: null,
     },
+    {
+        title: 'Agent access',
+        href: '/settings/agent-access',
+        icon: null,
+    },
 ];
 
 export default function SettingsLayout({ children }: PropsWithChildren) {
     const { isCurrentOrParentUrl } = useCurrentUrl();
+    const isAgentAccessPage =
+        isCurrentOrParentUrl('/settings/agent-access') ||
+        isCurrentOrParentUrl('/settings/agent-tokens') ||
+        isCurrentOrParentUrl('/settings/provider-accounts');
 
     return (
         <div className="px-4 py-6">
@@ -56,7 +65,11 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                                 variant="ghost"
                                 asChild
                                 className={cn('w-full justify-start', {
-                                    'bg-muted': isCurrentOrParentUrl(item.href),
+                                    'bg-muted':
+                                        isCurrentOrParentUrl(item.href) ||
+                                        (item.href ===
+                                            '/settings/agent-access' &&
+                                            isAgentAccessPage),
                                 })}
                             >
                                 <Link href={item.href}>

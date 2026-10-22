@@ -21,6 +21,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property string $name
  * @property string $email
  * @property string $role
+ * @property bool $can_assign_provider_accounts
  * @property Carbon|null $email_verified_at
  * @property string $password
  * @property string $role
@@ -32,7 +33,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property Carbon|null $updated_at
  */
 #[Fillable(['name', 'email', 'password', 'role'])]
-#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
+#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token', 'can_assign_provider_accounts'])]
 class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
@@ -46,6 +47,11 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
+    }
+
+    public function canAssignProviderAccounts(): bool
+    {
+        return $this->hasVerifiedEmail() && $this->isAdmin() && $this->can_assign_provider_accounts;
     }
 
     /**
@@ -62,6 +68,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     protected function casts(): array
     {
         return [
+            'can_assign_provider_accounts' => 'boolean',
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             /* @chisel-2fa */
