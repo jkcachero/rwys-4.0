@@ -1,4 +1,5 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, type RouteFormDefinition } from './../../../wayfinder'
+import assignments from './assignments'
 import permissions from './permissions'
 import tokens from './tokens'
 /**
@@ -84,6 +85,7 @@ edit.form = editForm
 
 const agentAccess = {
     edit: Object.assign(edit, edit),
+    assignments: Object.assign(assignments, assignments),
     permissions: Object.assign(permissions, permissions),
     tokens: Object.assign(tokens, tokens),
 }

@@ -3,6 +3,7 @@
 namespace App\Zernio;
 
 use App\Exceptions\Zernio\ZernioRequestException;
+use App\Models\ProviderConnection;
 use App\Models\ProviderProfile;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
@@ -12,6 +13,28 @@ use Throwable;
 
 class ZernioHttpClient
 {
+    public function profiles(ProviderConnection $connection, int $limit, int $skip): ZernioResponse
+    {
+        return $this->getWithConnection($connection, '/v1/profiles', [
+            'limit' => $limit,
+            'skip' => $skip,
+        ]);
+    }
+
+    public function profileById(ProviderConnection $connection, string $providerProfileId): ZernioResponse
+    {
+        return $this->getWithConnection($connection, '/v1/profiles/'.rawurlencode($providerProfileId));
+    }
+
+    public function profileAccounts(ProviderConnection $connection, string $providerProfileId, int $limit, int $skip): ZernioResponse
+    {
+        return $this->getWithConnection($connection, '/v1/accounts', [
+            'profileId' => $providerProfileId,
+            'limit' => $limit,
+            'skip' => $skip,
+        ]);
+    }
+
     public function profile(ProviderProfile $profile): ZernioResponse
     {
         return $this->get($profile, '/v1/profiles/'.rawurlencode($profile->provider_id));
@@ -81,13 +104,30 @@ class ZernioHttpClient
         array $query = [],
         array $acceptedStatuses = [200],
     ): ZernioResponse {
+        $connection = $profile->providerConnection;
+
+        if ($connection === null) {
+            throw new ZernioRequestException('Zernio credentials are unavailable.', 503, 'provider_unavailable');
+        }
+
+        return $this->getWithConnection($connection, $path, $query, $acceptedStatuses);
+    }
+
+    /**
+     * @param  array<string, scalar>  $query
+     * @param  list<int>  $acceptedStatuses
+     */
+    private function getWithConnection(
+        ProviderConnection $connection,
+        string $path,
+        array $query = [],
+        array $acceptedStatuses = [200],
+    ): ZernioResponse {
         if (! config('services.zernio.enabled')) {
             throw new ZernioRequestException('Zernio access is unavailable.', 503, 'provider_unavailable');
         }
 
-        $connection = $profile->providerConnection;
-
-        if ($connection === null || $connection->provider !== 'zernio') {
+        if ($connection->provider !== 'zernio') {
             throw new ZernioRequestException('Zernio credentials are unavailable.', 503, 'provider_unavailable');
         }
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Settings\AgentAccessController;
+use App\Http\Controllers\Settings\AgentProfileAssignmentController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\ProviderConnectionController;
 use App\Http\Controllers\Settings\SecurityController;
@@ -37,8 +38,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('settings/connections/{provider}', [ProviderConnectionController::class, 'disconnect'])->name('connections.disconnect');
 
     Route::get('settings/agent-access', [AgentAccessController::class, 'edit'])->name('settings.agent-access.edit');
+    Route::get('settings/agent-access/{client}/provider-profiles', [AgentProfileAssignmentController::class, 'profiles'])
+        ->name('settings.agent-access.assignments.profiles');
 
     Route::middleware(RequirePassword::class)->group(function () {
+        Route::post('settings/agent-access/{client}/provider-profiles', [AgentProfileAssignmentController::class, 'store'])
+            ->name('settings.agent-access.assignments.store');
+        Route::post('settings/agent-access/{client}/provider-profiles/{profile}/sync', [AgentProfileAssignmentController::class, 'sync'])
+            ->name('settings.agent-access.assignments.sync');
         Route::patch('settings/agent-access/{client}/permissions/{permission}', [AgentAccessController::class, 'updatePermission'])
             ->name('settings.agent-access.permissions.update');
         Route::post('settings/agent-access/{client}/tokens', [AgentAccessController::class, 'storeToken'])

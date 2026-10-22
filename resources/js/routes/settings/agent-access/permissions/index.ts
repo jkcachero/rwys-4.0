@@ -1,7 +1,7 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, type RouteFormDefinition, applyUrlDefaults } from './../../../../wayfinder'
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::update
-* @see app/Http/Controllers/Settings/AgentAccessController.php:56
+* @see app/Http/Controllers/Settings/AgentAccessController.php:66
 * @route '/settings/agent-access/{client}/permissions/{permission}'
 */
 export const update = (args: { client: string | number | { public_id: string | number }, permission: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, permission: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteDefinition<'patch'> => ({
@@ -16,7 +16,7 @@ update.definition = {
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::update
-* @see app/Http/Controllers/Settings/AgentAccessController.php:56
+* @see app/Http/Controllers/Settings/AgentAccessController.php:66
 * @route '/settings/agent-access/{client}/permissions/{permission}'
 */
 update.url = (args: { client: string | number | { public_id: string | number }, permission: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, permission: string | number | { id: string | number } ], options?: RouteQueryOptions) => {
@@ -46,7 +46,7 @@ update.url = (args: { client: string | number | { public_id: string | number }, 
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::update
-* @see app/Http/Controllers/Settings/AgentAccessController.php:56
+* @see app/Http/Controllers/Settings/AgentAccessController.php:66
 * @route '/settings/agent-access/{client}/permissions/{permission}'
 */
 update.patch = (args: { client: string | number | { public_id: string | number }, permission: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, permission: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteDefinition<'patch'> => ({
@@ -56,7 +56,7 @@ update.patch = (args: { client: string | number | { public_id: string | number }
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::update
-* @see app/Http/Controllers/Settings/AgentAccessController.php:56
+* @see app/Http/Controllers/Settings/AgentAccessController.php:66
 * @route '/settings/agent-access/{client}/permissions/{permission}'
 */
 const updateForm = (args: { client: string | number | { public_id: string | number }, permission: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, permission: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -71,7 +71,7 @@ const updateForm = (args: { client: string | number | { public_id: string | numb
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::update
-* @see app/Http/Controllers/Settings/AgentAccessController.php:56
+* @see app/Http/Controllers/Settings/AgentAccessController.php:66
 * @route '/settings/agent-access/{client}/permissions/{permission}'
 */
 updateForm.patch = (args: { client: string | number | { public_id: string | number }, permission: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, permission: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({

@@ -14,6 +14,11 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    profiles as discoverProfiles,
+    store as assignProfile,
+    sync as syncProfile,
+} from '@/actions/App/Http/Controllers/Settings/AgentProfileAssignmentController';
 
 const futureDateTime = () => {
     const date = new Date();
@@ -69,6 +74,7 @@ type AgentToken = {
 
 type SelectedClient = ClientSummary & {
     can_manage: boolean;
+    can_assign_profiles: boolean;
     approved_origins: string[];
     profiles: Profile[];
     capabilities: Record<string, Capability>;
@@ -78,6 +84,18 @@ type SelectedClient = ClientSummary & {
 type Ability = {
     value: string;
     label: string;
+};
+
+type DiscoverableProfile = {
+    id: string;
+    name: string;
+    account_count: number | null;
+};
+
+type ProfileDiscovery = {
+    profiles: DiscoverableProfile[];
+    page: number;
+    has_more: boolean;
 };
 
 type Props = {
@@ -341,6 +359,136 @@ function TokenCreationForm({
     );
 }
 
+function ProfileAssignment({ client }: { client: SelectedClient }) {
+    const [discovery, setDiscovery] = useState<ProfileDiscovery | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const loadProfiles = async (page: number) => {
+        setLoading(true);
+        setError(null);
+
+        try {
+            const response = await fetch(
+                discoverProfiles(client.id, { query: { page } }).url,
+                {
+                    credentials: 'same-origin',
+                    headers: { Accept: 'application/json' },
+                },
+            );
+            const payload = (await response.json()) as
+                | ProfileDiscovery
+                | { message?: string };
+
+            if (!response.ok || !('profiles' in payload)) {
+                throw new Error(
+                    'message' in payload && payload.message
+                        ? payload.message
+                        : 'Unable to load Zernio profiles.',
+                );
+            }
+
+            setDiscovery(payload);
+        } catch (discoveryError) {
+            setError(
+                discoveryError instanceof Error
+                    ? discoveryError.message
+                    : 'Unable to load Zernio profiles.',
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Assign a Zernio profile</CardTitle>
+                <CardDescription>
+                    Load profiles from your connected Zernio account, then
+                    assign one complete profile and its accounts to this Client.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {discovery === null ? (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        disabled={loading}
+                        onClick={() => loadProfiles(1)}
+                    >
+                        {loading ? 'Loading profiles…' : 'Load Zernio profiles'}
+                    </Button>
+                ) : discovery.profiles.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                        No Zernio profiles are available on this page.
+                    </p>
+                ) : (
+                    <div className="space-y-3">
+                        {discovery.profiles.map((profile) => (
+                            <div
+                                key={profile.id}
+                                className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
+                            >
+                                <div>
+                                    <p className="font-medium">
+                                        {profile.name}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                        {profile.account_count === null
+                                            ? 'Account count unavailable'
+                                            : `${profile.account_count} account${profile.account_count === 1 ? '' : 's'}`}
+                                    </p>
+                                </div>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() =>
+                                        router.post(
+                                            assignProfile(client.id).url,
+                                            {
+                                                provider_profile_id: profile.id,
+                                            },
+                                            { preserveScroll: true },
+                                        )
+                                    }
+                                >
+                                    Assign profile
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {discovery !== null && (
+                    <div className="flex gap-2">
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={loading || discovery.page === 1}
+                            onClick={() => loadProfiles(discovery.page - 1)}
+                        >
+                            Previous
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={loading || !discovery.has_more}
+                            onClick={() => loadProfiles(discovery.page + 1)}
+                        >
+                            Next
+                        </Button>
+                    </div>
+                )}
+
+                {error && <InputError message={error} />}
+            </CardContent>
+        </Card>
+    );
+}
+
 function PlaintextToken({ token, notice }: { token: string; notice?: string }) {
     const [copied, setCopied] = useState(false);
 
@@ -497,6 +645,10 @@ export default function AgentAccess({
                             />
                         )}
 
+                        {selectedClient.can_assign_profiles && (
+                            <ProfileAssignment client={selectedClient} />
+                        )}
+
                         <div className="space-y-4">
                             <Heading
                                 variant="small"
@@ -516,9 +668,33 @@ export default function AgentAccess({
                                 selectedClient.profiles.map((profile) => (
                                     <Card key={profile.id}>
                                         <CardHeader>
-                                            <CardTitle>
-                                                {profile.name}
-                                            </CardTitle>
+                                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                                <CardTitle>
+                                                    {profile.name}
+                                                </CardTitle>
+                                                {selectedClient.can_assign_profiles && (
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() =>
+                                                            router.post(
+                                                                syncProfile({
+                                                                    client: selectedClient.id,
+                                                                    profile:
+                                                                        profile.id,
+                                                                }).url,
+                                                                {},
+                                                                {
+                                                                    preserveScroll: true,
+                                                                },
+                                                            )
+                                                        }
+                                                    >
+                                                        Sync accounts
+                                                    </Button>
+                                                )}
+                                            </div>
                                             <CardDescription>
                                                 {profile.provider} · Last
                                                 synchronized:{' '}

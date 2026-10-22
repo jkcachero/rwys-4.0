@@ -48,6 +48,12 @@ class Client extends Model
         return $this->hasMany(ClientAccountPermission::class);
     }
 
+    /** @return HasMany<ClientOperatorGrant, $this> */
+    public function operatorGrants(): HasMany
+    {
+        return $this->hasMany(ClientOperatorGrant::class);
+    }
+
     public function hasActiveMember(User $user): bool
     {
         return $this->users()->whereKey($user->getKey())->wherePivot('is_active', true)->exists();

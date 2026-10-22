@@ -82,7 +82,7 @@ edit.form = editForm
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::updatePermission
-* @see app/Http/Controllers/Settings/AgentAccessController.php:56
+* @see app/Http/Controllers/Settings/AgentAccessController.php:66
 * @route '/settings/agent-access/{client}/permissions/{permission}'
 */
 export const updatePermission = (args: { client: string | number | { public_id: string | number }, permission: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, permission: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteDefinition<'patch'> => ({
@@ -97,7 +97,7 @@ updatePermission.definition = {
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::updatePermission
-* @see app/Http/Controllers/Settings/AgentAccessController.php:56
+* @see app/Http/Controllers/Settings/AgentAccessController.php:66
 * @route '/settings/agent-access/{client}/permissions/{permission}'
 */
 updatePermission.url = (args: { client: string | number | { public_id: string | number }, permission: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, permission: string | number | { id: string | number } ], options?: RouteQueryOptions) => {
@@ -127,7 +127,7 @@ updatePermission.url = (args: { client: string | number | { public_id: string | 
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::updatePermission
-* @see app/Http/Controllers/Settings/AgentAccessController.php:56
+* @see app/Http/Controllers/Settings/AgentAccessController.php:66
 * @route '/settings/agent-access/{client}/permissions/{permission}'
 */
 updatePermission.patch = (args: { client: string | number | { public_id: string | number }, permission: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, permission: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteDefinition<'patch'> => ({
@@ -137,7 +137,7 @@ updatePermission.patch = (args: { client: string | number | { public_id: string 
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::updatePermission
-* @see app/Http/Controllers/Settings/AgentAccessController.php:56
+* @see app/Http/Controllers/Settings/AgentAccessController.php:66
 * @route '/settings/agent-access/{client}/permissions/{permission}'
 */
 const updatePermissionForm = (args: { client: string | number | { public_id: string | number }, permission: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, permission: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -152,7 +152,7 @@ const updatePermissionForm = (args: { client: string | number | { public_id: str
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::updatePermission
-* @see app/Http/Controllers/Settings/AgentAccessController.php:56
+* @see app/Http/Controllers/Settings/AgentAccessController.php:66
 * @route '/settings/agent-access/{client}/permissions/{permission}'
 */
 updatePermissionForm.patch = (args: { client: string | number | { public_id: string | number }, permission: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, permission: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -169,7 +169,7 @@ updatePermission.form = updatePermissionForm
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::storeToken
-* @see app/Http/Controllers/Settings/AgentAccessController.php:66
+* @see app/Http/Controllers/Settings/AgentAccessController.php:76
 * @route '/settings/agent-access/{client}/tokens'
 */
 export const storeToken = (args: { client: string | number | { public_id: string | number } } | [client: string | number | { public_id: string | number } ] | string | number | { public_id: string | number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -184,7 +184,7 @@ storeToken.definition = {
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::storeToken
-* @see app/Http/Controllers/Settings/AgentAccessController.php:66
+* @see app/Http/Controllers/Settings/AgentAccessController.php:76
 * @route '/settings/agent-access/{client}/tokens'
 */
 storeToken.url = (args: { client: string | number | { public_id: string | number } } | [client: string | number | { public_id: string | number } ] | string | number | { public_id: string | number }, options?: RouteQueryOptions) => {
@@ -217,7 +217,7 @@ storeToken.url = (args: { client: string | number | { public_id: string | number
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::storeToken
-* @see app/Http/Controllers/Settings/AgentAccessController.php:66
+* @see app/Http/Controllers/Settings/AgentAccessController.php:76
 * @route '/settings/agent-access/{client}/tokens'
 */
 storeToken.post = (args: { client: string | number | { public_id: string | number } } | [client: string | number | { public_id: string | number } ] | string | number | { public_id: string | number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -227,7 +227,7 @@ storeToken.post = (args: { client: string | number | { public_id: string | numbe
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::storeToken
-* @see app/Http/Controllers/Settings/AgentAccessController.php:66
+* @see app/Http/Controllers/Settings/AgentAccessController.php:76
 * @route '/settings/agent-access/{client}/tokens'
 */
 const storeTokenForm = (args: { client: string | number | { public_id: string | number } } | [client: string | number | { public_id: string | number } ] | string | number | { public_id: string | number }, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -237,7 +237,7 @@ const storeTokenForm = (args: { client: string | number | { public_id: string | 
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::storeToken
-* @see app/Http/Controllers/Settings/AgentAccessController.php:66
+* @see app/Http/Controllers/Settings/AgentAccessController.php:76
 * @route '/settings/agent-access/{client}/tokens'
 */
 storeTokenForm.post = (args: { client: string | number | { public_id: string | number } } | [client: string | number | { public_id: string | number } ] | string | number | { public_id: string | number }, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -249,7 +249,7 @@ storeToken.form = storeTokenForm
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::rotateToken
-* @see app/Http/Controllers/Settings/AgentAccessController.php:86
+* @see app/Http/Controllers/Settings/AgentAccessController.php:96
 * @route '/settings/agent-access/{client}/tokens/{token}/rotate'
 */
 export const rotateToken = (args: { client: string | number | { public_id: string | number }, token: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, token: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -264,7 +264,7 @@ rotateToken.definition = {
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::rotateToken
-* @see app/Http/Controllers/Settings/AgentAccessController.php:86
+* @see app/Http/Controllers/Settings/AgentAccessController.php:96
 * @route '/settings/agent-access/{client}/tokens/{token}/rotate'
 */
 rotateToken.url = (args: { client: string | number | { public_id: string | number }, token: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, token: string | number | { id: string | number } ], options?: RouteQueryOptions) => {
@@ -294,7 +294,7 @@ rotateToken.url = (args: { client: string | number | { public_id: string | numbe
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::rotateToken
-* @see app/Http/Controllers/Settings/AgentAccessController.php:86
+* @see app/Http/Controllers/Settings/AgentAccessController.php:96
 * @route '/settings/agent-access/{client}/tokens/{token}/rotate'
 */
 rotateToken.post = (args: { client: string | number | { public_id: string | number }, token: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, token: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -304,7 +304,7 @@ rotateToken.post = (args: { client: string | number | { public_id: string | numb
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::rotateToken
-* @see app/Http/Controllers/Settings/AgentAccessController.php:86
+* @see app/Http/Controllers/Settings/AgentAccessController.php:96
 * @route '/settings/agent-access/{client}/tokens/{token}/rotate'
 */
 const rotateTokenForm = (args: { client: string | number | { public_id: string | number }, token: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, token: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -314,7 +314,7 @@ const rotateTokenForm = (args: { client: string | number | { public_id: string |
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::rotateToken
-* @see app/Http/Controllers/Settings/AgentAccessController.php:86
+* @see app/Http/Controllers/Settings/AgentAccessController.php:96
 * @route '/settings/agent-access/{client}/tokens/{token}/rotate'
 */
 rotateTokenForm.post = (args: { client: string | number | { public_id: string | number }, token: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, token: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -326,7 +326,7 @@ rotateToken.form = rotateTokenForm
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::destroyToken
-* @see app/Http/Controllers/Settings/AgentAccessController.php:109
+* @see app/Http/Controllers/Settings/AgentAccessController.php:119
 * @route '/settings/agent-access/{client}/tokens/{token}'
 */
 export const destroyToken = (args: { client: string | number | { public_id: string | number }, token: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, token: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteDefinition<'delete'> => ({
@@ -341,7 +341,7 @@ destroyToken.definition = {
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::destroyToken
-* @see app/Http/Controllers/Settings/AgentAccessController.php:109
+* @see app/Http/Controllers/Settings/AgentAccessController.php:119
 * @route '/settings/agent-access/{client}/tokens/{token}'
 */
 destroyToken.url = (args: { client: string | number | { public_id: string | number }, token: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, token: string | number | { id: string | number } ], options?: RouteQueryOptions) => {
@@ -371,7 +371,7 @@ destroyToken.url = (args: { client: string | number | { public_id: string | numb
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::destroyToken
-* @see app/Http/Controllers/Settings/AgentAccessController.php:109
+* @see app/Http/Controllers/Settings/AgentAccessController.php:119
 * @route '/settings/agent-access/{client}/tokens/{token}'
 */
 destroyToken.delete = (args: { client: string | number | { public_id: string | number }, token: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, token: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteDefinition<'delete'> => ({
@@ -381,7 +381,7 @@ destroyToken.delete = (args: { client: string | number | { public_id: string | n
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::destroyToken
-* @see app/Http/Controllers/Settings/AgentAccessController.php:109
+* @see app/Http/Controllers/Settings/AgentAccessController.php:119
 * @route '/settings/agent-access/{client}/tokens/{token}'
 */
 const destroyTokenForm = (args: { client: string | number | { public_id: string | number }, token: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, token: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -396,7 +396,7 @@ const destroyTokenForm = (args: { client: string | number | { public_id: string 
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::destroyToken
-* @see app/Http/Controllers/Settings/AgentAccessController.php:109
+* @see app/Http/Controllers/Settings/AgentAccessController.php:119
 * @route '/settings/agent-access/{client}/tokens/{token}'
 */
 destroyTokenForm.delete = (args: { client: string | number | { public_id: string | number }, token: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, token: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({

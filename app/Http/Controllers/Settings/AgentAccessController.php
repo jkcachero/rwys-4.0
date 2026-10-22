@@ -21,11 +21,21 @@ class AgentAccessController extends Controller
 {
     public function edit(Request $request): Response
     {
-        $clients = $request->user()->clients()
-            ->where('clients.is_active', true)
-            ->wherePivot('is_active', true)
-            ->orderBy('clients.name')
-            ->get(['clients.id', 'clients.public_id', 'clients.name']);
+        $user = $request->user();
+        $clients = Client::query()
+            ->where('is_active', true)
+            ->where(function ($query) use ($user): void {
+                $query->whereHas('users', fn ($users) => $users
+                    ->whereKey($user->id)
+                    ->where('client_user.is_active', true))
+                    ->orWhereHas('operatorGrants', fn ($grants) => $grants
+                        ->where('user_id', $user->id)
+                        ->where('is_active', true));
+            })
+            ->with(['users' => fn ($users) => $users->whereKey($user->id)])
+            ->orderBy('name')
+            ->limit(100)
+            ->get();
 
         $selectedClient = $clients->firstWhere('public_id', $request->string('client')->toString())
             ?? $clients->first();
@@ -34,7 +44,7 @@ class AgentAccessController extends Controller
             'clients' => $clients->map(fn (Client $client): array => [
                 'id' => $client->public_id,
                 'name' => $client->name,
-                'role' => $client->pivot->role,
+                'role' => $this->accessRole($client),
             ])->values(),
             'selectedClient' => $selectedClient === null
                 ? null
@@ -128,7 +138,15 @@ class AgentAccessController extends Controller
     /** @return array<string, mixed> */
     private function clientDetails(Client $client, Request $request): array
     {
-        $canManage = $client->hasActiveOwner($request->user());
+        $user = $request->user();
+        $canManage = $client->hasActiveOwner($user);
+        $canAssignProfiles = $user->hasVerifiedEmail()
+            && $user->isAdmin()
+            && $client->users()->wherePivot('role', 'owner')->wherePivot('is_active', true)->exists()
+            && $client->operatorGrants()
+                ->where('user_id', $user->id)
+                ->where('is_active', true)
+                ->exists();
         $permissions = $client->accountPermissions()
             ->with('account.profile')
             ->orderBy('id')
@@ -143,8 +161,9 @@ class AgentAccessController extends Controller
         return [
             'id' => $client->public_id,
             'name' => $client->name,
-            'role' => $client->pivot->role,
+            'role' => $this->accessRole($client),
             'can_manage' => $canManage,
+            'can_assign_profiles' => $canAssignProfiles,
             'approved_origins' => $client->approved_origins,
             'profiles' => $profiles->map(fn ($profile): array => [
                 'id' => $profile->public_id,
@@ -189,6 +208,11 @@ class AgentAccessController extends Controller
                     ])->values()
                 : [],
         ];
+    }
+
+    private function accessRole(Client $client): string
+    {
+        return $client->users->first()?->pivot->role ?? 'operator';
     }
 
     private function redirectToClient(Client $client): RedirectResponse

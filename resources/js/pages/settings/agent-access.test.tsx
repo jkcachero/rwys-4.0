@@ -29,6 +29,7 @@ const selectedClient = {
     name: 'Acme',
     role: 'owner',
     can_manage: true,
+    can_assign_profiles: false,
     approved_origins: ['https://agents.example.com'],
     profiles: [],
     capabilities: {
@@ -77,5 +78,26 @@ describe('Agent access settings', () => {
         expect(markup).toContain('Store this token now.');
         expect(markup).toContain('secret-token');
         expect(markup).toContain('No tokens have been issued');
+        expect(markup).not.toContain('Load Zernio profiles');
+    });
+
+    it('shows assignment controls to an authorized operator without owner token controls', () => {
+        const operatorClient = {
+            ...selectedClient,
+            role: 'operator',
+            can_manage: false,
+            can_assign_profiles: true,
+        };
+        const markup = renderToStaticMarkup(
+            <AgentAccess
+                clients={[operatorClient]}
+                selectedClient={operatorClient}
+                abilities={abilities}
+            />,
+        );
+
+        expect(markup).toContain('Assign a Zernio profile');
+        expect(markup).toContain('Load Zernio profiles');
+        expect(markup).not.toContain('Issue an agent token');
     });
 });

@@ -15,13 +15,18 @@ class ProviderProfile extends Model
     /** @use HasFactory<ProviderProfileFactory> */
     use HasFactory;
 
-    protected $fillable = ['provider_connection_id', 'provider', 'provider_id', 'provider_id_hash', 'name', 'synchronized_at', 'is_active'];
+    protected $fillable = ['provider_connection_id', 'provider', 'provider_id', 'provider_id_hash', 'name', 'synchronized_at', 'sync_generation', 'is_active'];
 
     protected static function booted(): void
     {
         static::creating(function (ProviderProfile $profile): void {
             $profile->public_id ??= (string) Str::uuid();
         });
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'public_id';
     }
 
     /** @return BelongsTo<ProviderConnection, $this> */
@@ -44,6 +49,11 @@ class ProviderProfile extends Model
 
     protected function casts(): array
     {
-        return ['provider_id' => 'encrypted', 'synchronized_at' => 'datetime', 'is_active' => 'boolean'];
+        return [
+            'provider_id' => 'encrypted',
+            'synchronized_at' => 'datetime',
+            'sync_generation' => 'integer',
+            'is_active' => 'boolean',
+        ];
     }
 }

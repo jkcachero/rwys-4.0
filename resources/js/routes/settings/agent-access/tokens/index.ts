@@ -1,7 +1,7 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, type RouteFormDefinition, applyUrlDefaults } from './../../../../wayfinder'
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::store
-* @see app/Http/Controllers/Settings/AgentAccessController.php:66
+* @see app/Http/Controllers/Settings/AgentAccessController.php:76
 * @route '/settings/agent-access/{client}/tokens'
 */
 export const store = (args: { client: string | number | { public_id: string | number } } | [client: string | number | { public_id: string | number } ] | string | number | { public_id: string | number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -16,7 +16,7 @@ store.definition = {
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::store
-* @see app/Http/Controllers/Settings/AgentAccessController.php:66
+* @see app/Http/Controllers/Settings/AgentAccessController.php:76
 * @route '/settings/agent-access/{client}/tokens'
 */
 store.url = (args: { client: string | number | { public_id: string | number } } | [client: string | number | { public_id: string | number } ] | string | number | { public_id: string | number }, options?: RouteQueryOptions) => {
@@ -49,7 +49,7 @@ store.url = (args: { client: string | number | { public_id: string | number } } 
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::store
-* @see app/Http/Controllers/Settings/AgentAccessController.php:66
+* @see app/Http/Controllers/Settings/AgentAccessController.php:76
 * @route '/settings/agent-access/{client}/tokens'
 */
 store.post = (args: { client: string | number | { public_id: string | number } } | [client: string | number | { public_id: string | number } ] | string | number | { public_id: string | number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -59,7 +59,7 @@ store.post = (args: { client: string | number | { public_id: string | number } }
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::store
-* @see app/Http/Controllers/Settings/AgentAccessController.php:66
+* @see app/Http/Controllers/Settings/AgentAccessController.php:76
 * @route '/settings/agent-access/{client}/tokens'
 */
 const storeForm = (args: { client: string | number | { public_id: string | number } } | [client: string | number | { public_id: string | number } ] | string | number | { public_id: string | number }, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -69,7 +69,7 @@ const storeForm = (args: { client: string | number | { public_id: string | numbe
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::store
-* @see app/Http/Controllers/Settings/AgentAccessController.php:66
+* @see app/Http/Controllers/Settings/AgentAccessController.php:76
 * @route '/settings/agent-access/{client}/tokens'
 */
 storeForm.post = (args: { client: string | number | { public_id: string | number } } | [client: string | number | { public_id: string | number } ] | string | number | { public_id: string | number }, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -81,7 +81,7 @@ store.form = storeForm
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::rotate
-* @see app/Http/Controllers/Settings/AgentAccessController.php:86
+* @see app/Http/Controllers/Settings/AgentAccessController.php:96
 * @route '/settings/agent-access/{client}/tokens/{token}/rotate'
 */
 export const rotate = (args: { client: string | number | { public_id: string | number }, token: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, token: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -96,7 +96,7 @@ rotate.definition = {
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::rotate
-* @see app/Http/Controllers/Settings/AgentAccessController.php:86
+* @see app/Http/Controllers/Settings/AgentAccessController.php:96
 * @route '/settings/agent-access/{client}/tokens/{token}/rotate'
 */
 rotate.url = (args: { client: string | number | { public_id: string | number }, token: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, token: string | number | { id: string | number } ], options?: RouteQueryOptions) => {
@@ -126,7 +126,7 @@ rotate.url = (args: { client: string | number | { public_id: string | number }, 
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::rotate
-* @see app/Http/Controllers/Settings/AgentAccessController.php:86
+* @see app/Http/Controllers/Settings/AgentAccessController.php:96
 * @route '/settings/agent-access/{client}/tokens/{token}/rotate'
 */
 rotate.post = (args: { client: string | number | { public_id: string | number }, token: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, token: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -136,7 +136,7 @@ rotate.post = (args: { client: string | number | { public_id: string | number },
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::rotate
-* @see app/Http/Controllers/Settings/AgentAccessController.php:86
+* @see app/Http/Controllers/Settings/AgentAccessController.php:96
 * @route '/settings/agent-access/{client}/tokens/{token}/rotate'
 */
 const rotateForm = (args: { client: string | number | { public_id: string | number }, token: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, token: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -146,7 +146,7 @@ const rotateForm = (args: { client: string | number | { public_id: string | numb
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::rotate
-* @see app/Http/Controllers/Settings/AgentAccessController.php:86
+* @see app/Http/Controllers/Settings/AgentAccessController.php:96
 * @route '/settings/agent-access/{client}/tokens/{token}/rotate'
 */
 rotateForm.post = (args: { client: string | number | { public_id: string | number }, token: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, token: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -158,7 +158,7 @@ rotate.form = rotateForm
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::destroy
-* @see app/Http/Controllers/Settings/AgentAccessController.php:109
+* @see app/Http/Controllers/Settings/AgentAccessController.php:119
 * @route '/settings/agent-access/{client}/tokens/{token}'
 */
 export const destroy = (args: { client: string | number | { public_id: string | number }, token: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, token: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteDefinition<'delete'> => ({
@@ -173,7 +173,7 @@ destroy.definition = {
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::destroy
-* @see app/Http/Controllers/Settings/AgentAccessController.php:109
+* @see app/Http/Controllers/Settings/AgentAccessController.php:119
 * @route '/settings/agent-access/{client}/tokens/{token}'
 */
 destroy.url = (args: { client: string | number | { public_id: string | number }, token: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, token: string | number | { id: string | number } ], options?: RouteQueryOptions) => {
@@ -203,7 +203,7 @@ destroy.url = (args: { client: string | number | { public_id: string | number },
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::destroy
-* @see app/Http/Controllers/Settings/AgentAccessController.php:109
+* @see app/Http/Controllers/Settings/AgentAccessController.php:119
 * @route '/settings/agent-access/{client}/tokens/{token}'
 */
 destroy.delete = (args: { client: string | number | { public_id: string | number }, token: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, token: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteDefinition<'delete'> => ({
@@ -213,7 +213,7 @@ destroy.delete = (args: { client: string | number | { public_id: string | number
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::destroy
-* @see app/Http/Controllers/Settings/AgentAccessController.php:109
+* @see app/Http/Controllers/Settings/AgentAccessController.php:119
 * @route '/settings/agent-access/{client}/tokens/{token}'
 */
 const destroyForm = (args: { client: string | number | { public_id: string | number }, token: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, token: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -228,7 +228,7 @@ const destroyForm = (args: { client: string | number | { public_id: string | num
 
 /**
 * @see \App\Http\Controllers\Settings\AgentAccessController::destroy
-* @see app/Http/Controllers/Settings/AgentAccessController.php:109
+* @see app/Http/Controllers/Settings/AgentAccessController.php:119
 * @route '/settings/agent-access/{client}/tokens/{token}'
 */
 destroyForm.delete = (args: { client: string | number | { public_id: string | number }, token: string | number | { id: string | number } } | [client: string | number | { public_id: string | number }, token: string | number | { id: string | number } ], options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
