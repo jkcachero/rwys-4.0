@@ -38,6 +38,12 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
+    /** @return HasMany<Client, $this> */
+    public function clients(): HasMany
+    {
+        return $this->hasMany(Client::class);
+    }
+
     public function aiConnections(): HasMany
     {
         return $this->hasMany(AIConnection::class);
