@@ -20,6 +20,13 @@ return [
             'authentication' => ['oauth'],
             'capabilities' => ['inference', 'model_discovery'],
         ],
+        'zernio' => [
+            'label' => 'Zernio',
+            'model' => null,
+            'authentication' => ['api_token'],
+            'capabilities' => ['profile_discovery', 'account_discovery'],
+            'message' => 'Connect a Zernio API token to discover and assign provider profiles to registered Clients.',
+        ],
         'anthropic' => [
             'label' => 'Claude',
             'model' => env('ANTHROPIC_MODEL', 'claude-3-5-haiku-latest'),

@@ -31,6 +31,11 @@ const sidebarNavItems: NavItem[] = [
         href: '/settings/connections',
         icon: null,
     },
+    {
+        title: 'Agent access',
+        href: '/settings/agent-access',
+        icon: null,
+    },
 ];
 
 export default function SettingsLayout({ children }: PropsWithChildren) {

@@ -7,6 +7,7 @@ use App\AdKit\Services\AdKitReadService;
 use App\AdKit\Support\FakeAdKitProvider;
 use App\Inference\InferenceService;
 use App\Inference\LaravelInferenceService;
+use App\Models\PersonalAccessToken;
 use App\Workspace\Contracts\WorkspaceAnalyst;
 use App\Workspace\Services\LaravelAiWorkspaceAnalyst;
 use App\Workspace\Services\WorkspaceReadService;
@@ -15,6 +16,7 @@ use App\Zernio\Data\ZernioAccount;
 use App\Zernio\Services\ZernioReadService;
 use App\Zernio\Support\FakeZernioProvider;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Sanctum\Sanctum;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -37,5 +39,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(WorkspaceReadService::class);
     }
 
-    public function boot(): void {}
+    public function boot(): void
+    {
+        Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+    }
 }
