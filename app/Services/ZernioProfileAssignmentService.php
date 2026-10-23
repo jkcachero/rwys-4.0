@@ -139,36 +139,40 @@ class ZernioProfileAssignmentService
         $accounts = [];
         $seenAccountIds = [];
         $total = null;
+        $pages = null;
 
-        for ($page = 0; $page < 3; $page++) {
-            $skip = $page * 100;
-            $response = $this->zernio->profileAccounts($connection, $providerProfileId, 100, $skip)->data;
+        for ($page = 1; $page <= 3; $page++) {
+            $response = $this->zernio->profileAccounts($connection, $providerProfileId, 100, $page)->data;
             $pageAccounts = $response['accounts'] ?? null;
+            $pagination = $response['pagination'] ?? null;
 
-            if (! is_array($pageAccounts) || ! array_is_list($pageAccounts)) {
+            if (! is_array($pageAccounts)
+                || ! array_is_list($pageAccounts)
+                || ! is_array($pagination)
+                || ($pagination['page'] ?? null) !== $page
+                || ($pagination['limit'] ?? null) !== 100
+                || ! is_int($pagination['total'] ?? null)
+                || ! is_int($pagination['pages'] ?? null)) {
                 throw $this->invalidProviderResponse();
             }
 
-            if (isset($response['skip']) && $response['skip'] !== $skip) {
+            if ($pagination['total'] < 0 || $pagination['total'] > 300 || $pagination['pages'] < 0 || $pagination['pages'] > 3) {
+                throw ValidationException::withMessages([
+                    'provider_profile_id' => 'This Zernio profile exceeds the 300-account import limit.',
+                ]);
+            }
+
+            $calculatedPages = $pagination['total'] === 0 ? 0 : (int) ceil($pagination['total'] / 100);
+
+            if ($pagination['pages'] !== $calculatedPages) {
                 throw $this->invalidProviderResponse();
             }
 
-            if (isset($response['limit']) && $response['limit'] !== 100) {
+            $total ??= $pagination['total'];
+            $pages ??= $pagination['pages'];
+
+            if ($total !== $pagination['total'] || $pages !== $pagination['pages']) {
                 throw $this->invalidProviderResponse();
-            }
-
-            if (isset($response['total'])) {
-                if (! is_int($response['total']) || $response['total'] < 0 || $response['total'] > 300) {
-                    throw ValidationException::withMessages([
-                        'provider_profile_id' => 'This Zernio profile exceeds the 300-account import limit.',
-                    ]);
-                }
-
-                $total ??= $response['total'];
-
-                if ($total !== $response['total']) {
-                    throw $this->invalidProviderResponse();
-                }
             }
 
             foreach ($pageAccounts as $account) {
@@ -190,22 +194,18 @@ class ZernioProfileAssignmentService
                 ]);
             }
 
-            if ($total !== null && count($accounts) >= $total) {
+            if ($page >= $pages) {
                 break;
             }
 
-            if (count($pageAccounts) < 100) {
-                break;
-            }
-
-            if ($page === 2) {
+            if (count($pageAccounts) !== 100) {
                 throw ValidationException::withMessages([
-                    'provider_profile_id' => 'Zernio did not return a complete profile within three pages.',
+                    'provider_profile_id' => 'Zernio returned an incomplete account snapshot.',
                 ]);
             }
         }
 
-        if ($total !== null && count($accounts) !== $total) {
+        if ($total === null || $pages === null || count($accounts) !== $total) {
             throw ValidationException::withMessages([
                 'provider_profile_id' => 'Zernio returned an incomplete account snapshot.',
             ]);
@@ -233,7 +233,7 @@ class ZernioProfileAssignmentService
 
         $profileReference = $this->nonEmptyString($profileReference);
         $platform = $this->nonEmptyString($account['platform'] ?? null);
-        $name = $this->nonEmptyString($account['displayName'] ?? $account['name'] ?? null);
+        $name = $this->nonEmptyString($account['displayName'] ?? $account['name'] ?? $account['username'] ?? $accountId);
 
         if ($accountId === null || $profileReference !== $providerProfileId || $platform === null || $name === null) {
             throw ValidationException::withMessages([

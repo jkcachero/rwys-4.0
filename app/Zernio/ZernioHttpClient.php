@@ -26,12 +26,12 @@ class ZernioHttpClient
         return $this->getWithConnection($connection, '/v1/profiles/'.rawurlencode($providerProfileId));
     }
 
-    public function profileAccounts(ProviderConnection $connection, string $providerProfileId, int $limit, int $skip): ZernioResponse
+    public function profileAccounts(ProviderConnection $connection, string $providerProfileId, int $limit, int $page): ZernioResponse
     {
         return $this->getWithConnection($connection, '/v1/accounts', [
             'profileId' => $providerProfileId,
             'limit' => $limit,
-            'skip' => $skip,
+            'page' => $page,
         ]);
     }
 

@@ -93,12 +93,22 @@ class AgentProfileAssignmentTest extends TestCase
             ]),
             'https://zernio.test/v1/accounts*' => Http::response([
                 'accounts' => [
-                    ['_id' => 'account-1', 'profileId' => 'profile-1', 'platform' => 'linkedin', 'displayName' => 'Acme LinkedIn'],
-                    ['_id' => 'account-2', 'profileId' => 'profile-1', 'platform' => 'instagram', 'displayName' => 'Acme Instagram'],
+                    [
+                        '_id' => 'account-1',
+                        'profileId' => ['_id' => 'profile-1', 'name' => 'Acme Social'],
+                        'platform' => 'linkedin',
+                        'username' => 'acme-linkedin',
+                        'isActive' => true,
+                    ],
+                    ['_id' => 'account-2', 'profileId' => 'profile-1', 'platform' => 'instagram', 'displayName' => 'Acme Instagram', 'isActive' => true],
                 ],
-                'total' => 2,
-                'skip' => 0,
-                'limit' => 100,
+                'hasAnalyticsAccess' => false,
+                'pagination' => [
+                    'page' => 1,
+                    'limit' => 100,
+                    'total' => 2,
+                    'pages' => 1,
+                ],
             ]),
         ]);
 
@@ -108,6 +118,8 @@ class AgentProfileAssignmentTest extends TestCase
                 'provider_profile_id' => 'profile-1',
             ])->assertRedirect(route('settings.agent-access.edit', ['client' => $client->public_id]));
 
+        Http::assertSent(fn ($request): bool => $request->url() === 'https://zernio.test/v1/accounts?profileId=profile-1&limit=100&page=1');
+
         $profile = ProviderProfile::query()->sole();
         $this->assertSame($connection->id, $profile->provider_connection_id);
         $this->assertSame('profile-1', $profile->provider_id);
@@ -115,6 +127,7 @@ class AgentProfileAssignmentTest extends TestCase
         $this->assertSame(1, $profile->sync_generation);
         $this->assertTrue($client->providerProfiles()->whereKey($profile->id)->exists());
         $this->assertDatabaseCount('provider_accounts', 2);
+        $this->assertSame('acme-linkedin', ProviderAccount::query()->where('platform', 'linkedin')->sole()->name);
 
         $permissions = ClientAccountPermission::query()->where('client_id', $client->id)->get();
         $this->assertCount(2, $permissions);
@@ -137,9 +150,13 @@ class AgentProfileAssignmentTest extends TestCase
                 'accounts' => [
                     ['_id' => 'account-1', 'profileId' => 'different-profile', 'platform' => 'linkedin', 'displayName' => 'Wrong Account'],
                 ],
-                'total' => 1,
-                'skip' => 0,
-                'limit' => 100,
+                'hasAnalyticsAccess' => false,
+                'pagination' => [
+                    'page' => 1,
+                    'limit' => 100,
+                    'total' => 1,
+                    'pages' => 1,
+                ],
             ]),
         ]);
 
@@ -256,9 +273,13 @@ class AgentProfileAssignmentTest extends TestCase
                     ['_id' => 'account-1', 'profileId' => 'profile-1', 'platform' => 'linkedin', 'displayName' => 'Renamed LinkedIn'],
                     ['_id' => 'account-3', 'profileId' => 'profile-1', 'platform' => 'threads', 'displayName' => 'New Threads'],
                 ],
-                'total' => 2,
-                'skip' => 0,
-                'limit' => 100,
+                'hasAnalyticsAccess' => false,
+                'pagination' => [
+                    'page' => 1,
+                    'limit' => 100,
+                    'total' => 2,
+                    'pages' => 1,
+                ],
             ]),
         ]);
 
