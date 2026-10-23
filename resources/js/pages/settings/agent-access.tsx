@@ -460,7 +460,15 @@ function ProfileAssignment({ client }: { client: SelectedClient }) {
                                             {
                                                 provider_profile_id: profile.id,
                                             },
-                                            { preserveScroll: true },
+                                            {
+                                                preserveScroll: true,
+                                                onStart: () => setError(null),
+                                                onError: (errors) =>
+                                                    setError(
+                                                        errors.provider_profile_id ??
+                                                            'Unable to assign this Zernio profile.',
+                                                    ),
+                                            },
                                         )
                                     }
                                 >

@@ -154,6 +154,61 @@ class AgentProfileAssignmentTest extends TestCase
         $this->assertDatabaseCount('client_provider_profiles', 0);
     }
 
+    public function test_assignment_provider_failure_returns_inertia_validation_feedback(): void
+    {
+        [$operator, $client] = $this->operatorAndClient();
+        $this->zernioConnection($operator);
+        config(['services.zernio.enabled' => true]);
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://zernio.test/v1/profiles/profile-1' => Http::response([
+                'message' => 'Unexpected provider response',
+            ], 502),
+        ]);
+
+        $this->actingAs($operator)
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->withHeader('X-Inertia', 'true')
+            ->post(route('settings.agent-access.assignments.store', $client), [
+                'provider_profile_id' => 'profile-1',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasErrors('provider_profile_id');
+
+        $this->assertDatabaseCount('provider_profiles', 0);
+        $this->assertDatabaseCount('provider_accounts', 0);
+        $this->assertDatabaseCount('client_provider_profiles', 0);
+    }
+
+    public function test_sync_provider_failure_returns_inertia_validation_feedback(): void
+    {
+        [$operator, $client] = $this->operatorAndClient();
+        $connection = $this->zernioConnection($operator);
+        $profile = ProviderProfile::factory()->create([
+            'provider_connection_id' => $connection->id,
+            'provider_id' => 'profile-1',
+            'provider_id_hash' => hash('sha256', 'profile-1'),
+            'sync_generation' => 3,
+        ]);
+        $client->providerProfiles()->attach($profile, ['assigned_by' => $operator->id, 'assigned_at' => now()]);
+        config(['services.zernio.enabled' => true]);
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://zernio.test/v1/profiles/profile-1' => Http::response([
+                'message' => 'Unexpected provider response',
+            ], 502),
+        ]);
+
+        $this->actingAs($operator)
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->withHeader('X-Inertia', 'true')
+            ->post(route('settings.agent-access.assignments.sync', [$client, $profile]))
+            ->assertRedirect()
+            ->assertSessionHasErrors('provider_profile_id');
+
+        $this->assertSame(3, $profile->fresh()->sync_generation);
+    }
+
     public function test_sync_preserves_disabled_permissions_and_deactivates_removed_accounts(): void
     {
         [$operator, $client] = $this->operatorAndClient();
