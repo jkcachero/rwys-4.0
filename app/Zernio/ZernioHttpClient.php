@@ -40,9 +40,13 @@ class ZernioHttpClient
         return $this->get($profile, '/v1/profiles/'.rawurlencode($profile->provider_id));
     }
 
-    public function account(ProviderProfile $profile, string $providerAccountId): ZernioResponse
+    public function accountPage(ProviderProfile $profile, int $limit, int $page): ZernioResponse
     {
-        return $this->get($profile, '/v1/accounts/'.rawurlencode($providerAccountId));
+        return $this->get($profile, '/v1/accounts', [
+            'profileId' => $profile->provider_id,
+            'limit' => $limit,
+            'page' => $page,
+        ]);
     }
 
     public function posts(ProviderProfile $profile, string $providerAccountId, int $limit, ?string $cursor): ZernioResponse

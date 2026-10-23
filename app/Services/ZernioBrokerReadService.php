@@ -16,15 +16,17 @@ use Illuminate\Support\Str;
 
 class ZernioBrokerReadService
 {
-    public function __construct(private readonly ZernioHttpClient $zernio) {}
+    public function __construct(
+        private readonly ZernioHttpClient $zernio,
+        private readonly ZernioAccountLookupService $accounts,
+    ) {}
 
     /** @return array<string, mixed> */
     public function accountStatus(Request $request, ProviderAccount $account): array
     {
         [$client, $token, $account, $profile] = $this->authorizedContext($request, $account);
         $this->verifyProfile($profile);
-        $providerAccount = $this->accountPayload($this->zernio->account($profile, $account->provider_id)->data);
-        $this->verifyAccount($providerAccount, $profile, $account);
+        $providerAccount = $this->accounts->find($profile, $account);
         $this->authorizedContext($request, $account);
 
         return [
@@ -162,11 +164,7 @@ class ZernioBrokerReadService
     private function verifyProfileAndAccount(ProviderProfile $profile, ProviderAccount $account): void
     {
         $this->verifyProfile($profile);
-        $this->verifyAccount(
-            $this->accountPayload($this->zernio->account($profile, $account->provider_id)->data),
-            $profile,
-            $account,
-        );
+        $this->accounts->find($profile, $account);
     }
 
     private function verifyProfile(ProviderProfile $profile): void
@@ -175,17 +173,6 @@ class ZernioBrokerReadService
 
         if ($this->referenceId(Arr::get($payload, '_id', Arr::get($payload, 'id'))) !== $profile->provider_id) {
             throw new ZernioRequestException('Zernio profile identity could not be verified.');
-        }
-    }
-
-    /** @param array<string, mixed> $payload */
-    private function verifyAccount(array $payload, ProviderProfile $profile, ProviderAccount $account): void
-    {
-        $providerAccountId = $this->referenceId(Arr::get($payload, '_id', Arr::get($payload, 'id')));
-        $providerProfileId = $this->referenceId(Arr::get($payload, 'profileId', Arr::get($payload, 'profile')));
-
-        if ($providerAccountId !== $account->provider_id || $providerProfileId !== $profile->provider_id) {
-            throw new ZernioRequestException('Zernio account ownership could not be verified.');
         }
     }
 
@@ -290,20 +277,6 @@ class ZernioBrokerReadService
 
         if (! is_array($payload)) {
             throw new ZernioRequestException('Zernio profile response was invalid.');
-        }
-
-        return $payload;
-    }
-
-    /** @param array<string, mixed> $data
-     * @return array<string, mixed>
-     */
-    private function accountPayload(array $data): array
-    {
-        $payload = Arr::get($data, 'account', $data);
-
-        if (! is_array($payload)) {
-            throw new ZernioRequestException('Zernio account response was invalid.');
         }
 
         return $payload;

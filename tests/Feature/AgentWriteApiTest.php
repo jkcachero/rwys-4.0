@@ -45,12 +45,15 @@ class AgentWriteApiTest extends TestCase
 
             return match ($path) {
                 '/api/v1/profiles/'.$profile->provider_id => Http::response(['profile' => ['_id' => $profile->provider_id]]),
-                '/api/v1/accounts/'.$account->provider_id => Http::response(['account' => [
-                    '_id' => $account->provider_id,
-                    'profileId' => $profile->provider_id,
-                    'isActive' => true,
-                    'status' => 'connected',
-                ]]),
+                '/api/v1/accounts' => Http::response([
+                    'accounts' => [[
+                        '_id' => $account->provider_id,
+                        'profileId' => $profile->provider_id,
+                        'isActive' => true,
+                        'status' => 'connected',
+                    ]],
+                    'pagination' => ['page' => 1, 'limit' => 100, 'total' => 1, 'pages' => 1],
+                ]),
                 '/api/v1/posts' => Http::response(['post' => [
                     '_id' => $providerPostId,
                     'accountIds' => [$account->provider_id],
@@ -174,12 +177,15 @@ class AgentWriteApiTest extends TestCase
 
             return match ($path) {
                 '/api/v1/profiles/'.$profile->provider_id => Http::response(['profile' => ['_id' => $profile->provider_id]]),
-                '/api/v1/accounts/'.$account->provider_id => Http::response(['account' => [
-                    '_id' => $account->provider_id,
-                    'profileId' => ['_id' => $profile->provider_id],
-                    'isActive' => true,
-                    'status' => 'connected',
-                ]]),
+                '/api/v1/accounts' => Http::response([
+                    'accounts' => [[
+                        '_id' => $account->provider_id,
+                        'profileId' => ['_id' => $profile->provider_id],
+                        'isActive' => true,
+                        'status' => 'connected',
+                    ]],
+                    'pagination' => ['page' => 1, 'limit' => 100, 'total' => 1, 'pages' => 1],
+                ]),
                 '/api/v1/media/upload-direct' => Http::response([
                     'url' => $uploadUrl,
                     'filename' => 'private-upload-id.jpg',

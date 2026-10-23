@@ -54,12 +54,15 @@ class AgentBrokerReadApiTest extends TestCase
 
             return match ($path) {
                 '/api/v1/profiles/'.$profile->provider_id => Http::response(['profile' => ['_id' => $profile->provider_id]]),
-                '/api/v1/accounts/'.$account->provider_id => Http::response(['account' => [
-                    '_id' => $account->provider_id,
-                    'profileId' => ['_id' => $profile->provider_id],
-                    'isActive' => true,
-                    'status' => 'connected',
-                ]]),
+                '/api/v1/accounts' => Http::response([
+                    'accounts' => [[
+                        '_id' => $account->provider_id,
+                        'profileId' => ['_id' => $profile->provider_id],
+                        'isActive' => true,
+                        'status' => 'connected',
+                    ]],
+                    'pagination' => ['page' => 1, 'limit' => 100, 'total' => 1, 'pages' => 1],
+                ]),
                 '/api/v1/posts' => Http::response([
                     'posts' => [[
                         '_id' => $providerPostId,
@@ -110,6 +113,11 @@ class AgentBrokerReadApiTest extends TestCase
             ->assertJsonPath('data.metrics.comments', null);
 
         Http::assertSent(fn (Request $request): bool => $request->hasHeader('Authorization', 'Bearer provider-secret'));
+        Http::assertSent(fn (Request $request): bool => parse_url($request->url(), PHP_URL_PATH) === '/api/v1/accounts'
+            && $request['profileId'] === $profile->provider_id
+            && $request['limit'] === 100
+            && $request['page'] === 1);
+        Http::assertNotSent(fn (Request $request): bool => parse_url($request->url(), PHP_URL_PATH) === '/api/v1/accounts/'.$account->provider_id);
         $this->assertDatabaseCount('provider_posts', 1);
         $this->assertDatabaseCount('agent_request_audits', 4);
     }
