@@ -36,10 +36,6 @@ class ZernioBrokerWriteService
 
         [$client, $token, $account, $profile] = $this->authorizedContext($request, $account, 'can_publish');
 
-        if (! in_array($account->platform, ['linkedin', 'facebook', 'threads', 'bluesky'], true)) {
-            throw new ZernioRequestException('This account does not support immediate text publishing.', 422, 'unsupported_platform');
-        }
-
         $intent = [
             'account_id' => $account->public_id,
             'content' => $content,

@@ -35,9 +35,9 @@ class AgentWriteApiTest extends TestCase
         Http::preventStrayRequests();
     }
 
-    public function test_immediate_publish_is_durable_permanently_idempotent_and_never_blindly_replayed(): void
+    public function test_immediate_publish_delegates_platform_support_and_is_durable_permanently_idempotent(): void
     {
-        [$token, , $account, $profile] = $this->writeContext('linkedin', AgentAbility::PostsPublish);
+        [$token, , $account, $profile] = $this->writeContext('instagram', AgentAbility::PostsPublish);
         $providerPostId = '0123456789abcdef01234567';
 
         Http::fake(function (Request $request) use ($account, $profile, $providerPostId) {
@@ -58,12 +58,12 @@ class AgentWriteApiTest extends TestCase
                     '_id' => $providerPostId,
                     'accountIds' => [$account->provider_id],
                     'content' => 'Ship the verified update.',
-                    'platforms' => ['linkedin'],
+                    'platforms' => ['instagram'],
                     'status' => 'published',
                     'platformPosts' => [[
-                        'platform' => 'linkedin',
+                        'platform' => 'instagram',
                         'status' => 'published',
-                        'url' => 'https://www.linkedin.com/feed/update/example',
+                        'url' => 'https://www.instagram.com/p/example',
                     ]],
                 ]], 201),
                 default => Http::response([], 500),
@@ -291,7 +291,8 @@ class AgentWriteApiTest extends TestCase
             'can_publish' => $ability === AgentAbility::PostsPublish,
             'can_schedule' => $ability === AgentAbility::PostsSchedule,
         ]);
-        $token = app(AgentTokenService::class)->issue($owner, $client, 'Write test', [$ability->value], null, [$account->public_id]);
+        $token = app(AgentTokenService::class)->issue($owner, $client, 'Write test', null, [$account->public_id]);
+        $token->accessToken->forceFill(['abilities' => [$ability->value]])->save();
 
         return [$token->plainTextToken, $client, $account, $profile];
     }

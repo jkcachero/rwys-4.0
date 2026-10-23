@@ -68,10 +68,6 @@ type SelectedClient = ClientSummary & {
     tokens: AgentToken[];
 };
 
-type Ability = {
-    value: string;
-};
-
 type DiscoverableProfile = {
     id: string;
     name: string;
@@ -87,14 +83,12 @@ type ProfileDiscovery = {
 type Props = {
     clients: ClientSummary[];
     selectedClient: SelectedClient | null;
-    abilities: Ability[];
     token_plaintext?: string;
     token_notice?: string;
 };
 
 type TokenForm = {
     name: string;
-    abilities: string[];
     allowed_account_ids: string[];
     expires_at: string;
 };
@@ -115,68 +109,21 @@ function accessLabels(abilities: string[]) {
     ].filter((label): label is string => label !== null);
 }
 
-function TokenCreationForm({
-    client,
-    abilities,
-}: {
-    client: SelectedClient;
-    abilities: Ability[];
-}) {
+function TokenCreationForm({ client }: { client: SelectedClient }) {
     const accounts = client.profiles.flatMap((profile) => profile.accounts);
-    const accessOptions = [
-        {
-            label: 'Read',
-            description:
-                'View connected accounts, posts, analytics, and activity.',
-            abilities: abilities
-                .filter((ability) => ability.value.endsWith('.read'))
-                .map((ability) => ability.value),
-        },
-        {
-            label: 'Publish',
-            description: 'Publish approved content immediately.',
-            abilities: abilities
-                .filter((ability) => ability.value.endsWith('.publish'))
-                .map((ability) => ability.value),
-        },
-        {
-            label: 'Schedule',
-            description: 'Schedule approved content for later.',
-            abilities: abilities
-                .filter((ability) => ability.value.endsWith('.schedule'))
-                .map((ability) => ability.value),
-        },
-    ].filter((option) => option.abilities.length > 0);
-    const defaultAbilities =
-        accessOptions.find((option) => option.label === 'Read')?.abilities ??
-        [];
     const { data, setData, post, processing, errors, reset } =
         useForm<TokenForm>({
             name: '',
-            abilities: defaultAbilities,
             allowed_account_ids: [],
             expires_at: futureDateTime(),
         });
 
-    const toggleValue = (
-        field: 'abilities' | 'allowed_account_ids',
-        value: string,
-        checked: boolean,
-    ) => {
+    const toggleAccount = (value: string, checked: boolean) => {
         setData(
-            field,
+            'allowed_account_ids',
             checked
-                ? [...data[field], value]
-                : data[field].filter((item) => item !== value),
-        );
-    };
-
-    const toggleAccess = (values: string[], checked: boolean) => {
-        setData(
-            'abilities',
-            checked
-                ? [...new Set([...data.abilities, ...values])]
-                : data.abilities.filter((ability) => !values.includes(ability)),
+                ? [...data.allowed_account_ids, value]
+                : data.allowed_account_ids.filter((item) => item !== value),
         );
     };
 
@@ -193,8 +140,8 @@ function TokenCreationForm({
             <CardHeader>
                 <CardTitle>Create secure access</CardTitle>
                 <CardDescription>
-                    Choose what this access can do and which connected accounts
-                    it may use. Access expires within 90 days.
+                    Access can read and publish for the connected accounts you
+                    select. Access expires within 90 days.
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -212,45 +159,6 @@ function TokenCreationForm({
                         />
                         <InputError message={errors.name} />
                     </div>
-
-                    <fieldset className="space-y-2">
-                        <legend className="text-sm font-medium">Access</legend>
-                        <div className="grid gap-3 sm:grid-cols-3">
-                            {accessOptions.map((option) => (
-                                <label
-                                    key={option.label}
-                                    className="flex items-start gap-3 rounded-lg border p-3"
-                                >
-                                    <Checkbox
-                                        className="mt-0.5"
-                                        checked={option.abilities.every(
-                                            (ability) =>
-                                                data.abilities.includes(
-                                                    ability,
-                                                ),
-                                        )}
-                                        onCheckedChange={(checked) =>
-                                            toggleAccess(
-                                                option.abilities,
-                                                checked === true,
-                                            )
-                                        }
-                                    />
-                                    <span>
-                                        <span className="block text-sm font-medium">
-                                            {option.label}
-                                        </span>
-                                        <span className="block text-xs text-muted-foreground">
-                                            {option.description}
-                                        </span>
-                                    </span>
-                                </label>
-                            ))}
-                        </div>
-                        <InputError
-                            message={errors.abilities ?? errors['abilities.0']}
-                        />
-                    </fieldset>
 
                     <fieldset className="space-y-2">
                         <legend className="text-sm font-medium">
@@ -274,8 +182,7 @@ function TokenCreationForm({
                                                 )}
                                                 disabled={!account.available}
                                                 onCheckedChange={(checked) =>
-                                                    toggleValue(
-                                                        'allowed_account_ids',
+                                                    toggleAccount(
                                                         account.id,
                                                         checked === true,
                                                     )
@@ -304,11 +211,7 @@ function TokenCreationForm({
                         <InputError message={errors.expires_at} />
                     </div>
 
-                    <Button
-                        disabled={processing || data.abilities.length === 0}
-                    >
-                        Create access
-                    </Button>
+                    <Button disabled={processing}>Create access</Button>
                 </form>
             </CardContent>
         </Card>
@@ -507,7 +410,6 @@ function PlaintextToken({ token, notice }: { token: string; notice?: string }) {
 export default function AgentAccess({
     clients,
     selectedClient,
-    abilities,
     token_plaintext,
     token_notice,
 }: Props) {
@@ -691,10 +593,7 @@ export default function AgentAccess({
                         </div>
 
                         {selectedClient.can_manage && (
-                            <TokenCreationForm
-                                client={selectedClient}
-                                abilities={abilities}
-                            />
+                            <TokenCreationForm client={selectedClient} />
                         )}
 
                         <Card>
@@ -772,8 +671,6 @@ export default function AgentAccess({
                                                                     `/settings/agent-access/${selectedClient.id}/tokens/${token.id}/rotate`,
                                                                     {
                                                                         name: `${token.name} rotated`,
-                                                                        abilities:
-                                                                            token.abilities,
                                                                         allowed_account_ids:
                                                                             token.allowed_account_ids,
                                                                     },

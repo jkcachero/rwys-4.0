@@ -14,15 +14,11 @@ use Laravel\Sanctum\NewAccessToken;
 
 class AgentTokenService
 {
-    /**
-     * @param  list<string>  $abilities
-     * @param  list<string>  $allowedAccountIds
-     */
+    /** @param list<string> $allowedAccountIds */
     public function issue(
         User $owner,
         Client $client,
         string $name,
-        array $abilities,
         ?DateTimeInterface $expiresAt = null,
         array $allowedAccountIds = [],
         ?PersonalAccessToken $rotatedFrom = null,
@@ -37,12 +33,6 @@ class AgentTokenService
             throw new DomainException('Agent tokens must expire within 90 days.');
         }
 
-        $validatedAbilities = AgentAbility::validate($abilities);
-
-        if (array_diff($validatedAbilities, AgentAbility::enabled()) !== []) {
-            throw new DomainException('Agent tokens may contain only enabled abilities.');
-        }
-
         $validatedAccountIds = $this->validateAllowedAccounts($client, $allowedAccountIds);
 
         if ($rotatedFrom !== null && ($rotatedFrom->client_id !== $client->id || $rotatedFrom->revoked_at !== null)) {
@@ -53,12 +43,11 @@ class AgentTokenService
             $owner,
             $client,
             $name,
-            $validatedAbilities,
             $expiration,
             $validatedAccountIds,
             $rotatedFrom,
         ): NewAccessToken {
-            $token = $owner->createToken($name, $validatedAbilities, $expiration);
+            $token = $owner->createToken($name, AgentAbility::clientTokenDefaults(), $expiration);
             $token->accessToken->forceFill([
                 'client_id' => $client->id,
                 'issued_by' => $owner->id,
@@ -74,26 +63,16 @@ class AgentTokenService
         });
     }
 
-    /**
-     * @param  list<string>  $abilities
-     * @param  list<string>  $allowedAccountIds
-     */
+    /** @param list<string> $allowedAccountIds */
     public function rotate(
         User $owner,
         Client $client,
         PersonalAccessToken $token,
         string $name,
-        array $abilities,
         array $allowedAccountIds = [],
     ): NewAccessToken {
         if ($token->expires_at === null) {
             throw new DomainException('Only finite-expiry agent tokens may be rotated.');
-        }
-
-        $currentAbilities = $token->abilities ?? [];
-
-        if (array_diff($abilities, $currentAbilities) !== []) {
-            throw new DomainException('Token rotation cannot add abilities.');
         }
 
         $currentAccountIds = $token->allowed_account_ids ?? [];
@@ -107,7 +86,6 @@ class AgentTokenService
             $owner,
             $client,
             $name,
-            $abilities,
             $token->expires_at,
             $allowedAccountIds,
             $token,

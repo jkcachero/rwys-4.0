@@ -35,7 +35,7 @@ class AgentCapabilityController extends Controller
             })
             ->exists();
 
-        $capabilities = collect(AgentAbility::enabled())
+        $capabilities = collect(AgentAbility::clientTokenDefaults())
             ->filter(fn (string $ability): bool => $token->can($ability))
             ->filter(fn (string $ability): bool => ! in_array($ability, [
                 AgentAbility::PostsRead->value,

@@ -20,7 +20,7 @@ class AgentContextController extends Controller
 
         return response()->json([
             'client' => ['id' => $client->public_id, 'name' => $client->name],
-            'capabilities' => array_values(array_intersect($token->abilities, AgentAbility::implemented())),
+            'capabilities' => array_values(array_intersect($token->abilities, AgentAbility::clientTokenDefaults())),
         ]);
     }
 }

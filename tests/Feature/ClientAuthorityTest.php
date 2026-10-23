@@ -100,26 +100,26 @@ class ClientAuthorityTest extends TestCase
         $this->assertDatabaseCount('provider_accounts', 0);
     }
 
-    public function test_verified_owner_can_issue_client_bound_token_with_exact_abilities(): void
+    public function test_verified_owner_can_issue_client_bound_token_with_fixed_capabilities(): void
     {
         $owner = User::factory()->create();
         $client = Client::factory()->create();
         $client->users()->attach($owner, ['role' => 'owner', 'is_active' => true]);
 
-        $token = app(AgentTokenService::class)->issue($owner, $client, 'Codex', AgentAbility::readOnly());
+        $token = app(AgentTokenService::class)->issue($owner, $client, 'Codex');
 
         $this->assertSame($client->id, $token->accessToken->client_id);
-        $this->assertSame(AgentAbility::readOnly(), $token->accessToken->abilities);
+        $this->assertSame(AgentAbility::clientTokenDefaults(), $token->accessToken->abilities);
         $this->assertNotEmpty($token->plainTextToken);
     }
 
-    public function test_agent_token_rejects_unknown_abilities_and_non_owner_issuers(): void
+    public function test_agent_token_rejects_non_owner_issuers(): void
     {
         $member = User::factory()->create();
         $client = Client::factory()->create();
         $client->users()->attach($member, ['role' => 'member', 'is_active' => true]);
 
         $this->expectException(\DomainException::class);
-        app(AgentTokenService::class)->issue($member, $client, 'Denied', ['accounts:*']);
+        app(AgentTokenService::class)->issue($member, $client, 'Denied');
     }
 }

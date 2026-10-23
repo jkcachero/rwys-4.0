@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
     title: RWYS Agent API
     version: 1.0.0
-    description: Client-scoped API for approved external agents with gated durable writes.
+    description: Curated client-scoped Zernio proxy with fixed read and publish capabilities, RWYS tenancy enforcement, and durable writes.
 servers:
     - url: /api/v1
 security:
@@ -343,7 +343,6 @@ components:
                 - zernio.analytics.read
                 - operations.read
                 - zernio.posts.publish
-                - zernio.posts.schedule
         PublishPostRequest:
             type: object
             additionalProperties: false

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Settings;
 
-use App\Enums\AgentAbility;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\IssueAgentTokenRequest;
 use App\Http\Requests\Settings\RotateAgentTokenRequest;
@@ -46,9 +45,6 @@ class AgentAccessController extends Controller
             'selectedClient' => $selectedClient === null
                 ? null
                 : $this->clientDetails($selectedClient, $request),
-            'abilities' => collect(AgentAbility::enabled())
-                ->map(fn (string $ability): array => ['value' => $ability])
-                ->values(),
         ];
 
         if ($request->session()->has('agent_token_plaintext')) {
@@ -79,7 +75,6 @@ class AgentAccessController extends Controller
             $request->user(),
             $client,
             $validated['name'],
-            $validated['abilities'],
             Carbon::parse($validated['expires_at']),
             $validated['allowed_account_ids'],
         );
@@ -103,7 +98,6 @@ class AgentAccessController extends Controller
             $client,
             $token,
             $validated['name'],
-            $validated['abilities'],
             $validated['allowed_account_ids'],
         );
 

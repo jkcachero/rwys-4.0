@@ -240,7 +240,8 @@ class AgentBrokerReadApiTest extends TestCase
             'provider_account_id' => $account,
             'can_read' => true,
         ]);
-        $token = app(AgentTokenService::class)->issue($owner, $client, 'Broker test', $abilities);
+        $token = app(AgentTokenService::class)->issue($owner, $client, 'Broker test');
+        $token->accessToken->forceFill(['abilities' => $abilities])->save();
 
         return [$token->plainTextToken, $client, $account, $profile];
     }

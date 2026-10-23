@@ -35,10 +35,6 @@ class RotateAgentTokenRequest extends IssueAgentTokenRequest
                     return;
                 }
 
-                if (array_diff($this->input('abilities', []), $token->abilities ?? []) !== []) {
-                    $validator->errors()->add('abilities', 'Token rotation cannot add abilities.');
-                }
-
                 $currentAccountIds = $token->allowed_account_ids ?? [];
 
                 $requestedAccountIds = $this->input('allowed_account_ids', []);
