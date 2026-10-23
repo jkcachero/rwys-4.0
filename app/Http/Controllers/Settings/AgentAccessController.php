@@ -10,6 +10,7 @@ use App\Http\Requests\Settings\UpdateAgentPermissionRequest;
 use App\Models\Client;
 use App\Models\ClientAccountPermission;
 use App\Models\PersonalAccessToken;
+use App\Models\User;
 use App\Services\AgentTokenService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,7 +33,7 @@ class AgentAccessController extends Controller
                         ->where('user_id', $user->id)
                         ->where('is_active', true));
             })
-            ->with(['users' => fn ($users) => $users->whereKey($user->id)])
+            ->with('users:id,name,email')
             ->orderBy('name')
             ->limit(100)
             ->get();
@@ -41,18 +42,13 @@ class AgentAccessController extends Controller
             ?? $clients->first();
 
         $props = [
-            'clients' => $clients->map(fn (Client $client): array => [
-                'id' => $client->public_id,
-                'name' => $client->name,
-                'role' => $this->accessRole($client),
-            ])->values(),
+            'clients' => $clients->map(fn (Client $client): array => $this->clientSummary($client))->values(),
             'selectedClient' => $selectedClient === null
                 ? null
                 : $this->clientDetails($selectedClient, $request),
-            'abilities' => collect(AgentAbility::enabled())->map(fn (string $ability): array => [
-                'value' => $ability,
-                'label' => str($ability)->replace('.', ' ')->headline()->toString(),
-            ])->values(),
+            'abilities' => collect(AgentAbility::enabled())
+                ->map(fn (string $ability): array => ['value' => $ability])
+                ->values(),
         ];
 
         if ($request->session()->has('agent_token_plaintext')) {
@@ -159,16 +155,12 @@ class AgentAccessController extends Controller
             ->get();
 
         return [
-            'id' => $client->public_id,
-            'name' => $client->name,
-            'role' => $this->accessRole($client),
+            ...$this->clientSummary($client),
             'can_manage' => $canManage,
             'can_assign_profiles' => $canAssignProfiles,
-            'approved_origins' => $client->approved_origins,
             'profiles' => $profiles->map(fn ($profile): array => [
                 'id' => $profile->public_id,
                 'name' => $profile->name,
-                'provider' => $profile->provider,
                 'synchronized_at' => $profile->synchronized_at?->toIso8601String(),
                 'accounts' => $profile->accounts->map(function ($account) use ($permissionByAccount): array {
                     $permission = $permissionByAccount->get($account->id);
@@ -177,20 +169,12 @@ class AgentAccessController extends Controller
                         'id' => $account->public_id,
                         'name' => $account->name,
                         'platform' => $account->platform,
-                        'is_active' => $account->is_active,
-                        'permission' => $permission === null ? null : [
-                            'id' => $permission->id,
-                            'is_active' => $permission->is_active,
-                            'can_read' => $permission->can_read,
-                            'can_publish' => $permission->can_publish,
-                            'can_schedule' => $permission->can_schedule,
-                        ],
+                        'available' => $account->is_active
+                            && $permission?->is_active === true
+                            && $permission->can_read,
                     ];
                 })->values(),
             ])->values(),
-            'capabilities' => collect(AgentAbility::cases())->mapWithKeys(fn (AgentAbility $ability): array => [
-                $ability->value => ['available' => in_array($ability->value, AgentAbility::enabled(), true)],
-            ]),
             'tokens' => $canManage
                 ? PersonalAccessToken::query()
                     ->where('client_id', $client->id)
@@ -210,9 +194,22 @@ class AgentAccessController extends Controller
         ];
     }
 
-    private function accessRole(Client $client): string
+    /** @return array<string, mixed> */
+    private function clientSummary(Client $client): array
     {
-        return $client->users->first()?->pivot->role ?? 'operator';
+        $owner = $client->users->first(
+            fn (User $member): bool => $member->pivot->role === 'owner'
+                && $member->pivot->is_active,
+        );
+
+        return [
+            'id' => $client->public_id,
+            'name' => $client->name,
+            'owner' => $owner === null ? null : [
+                'name' => $owner->name,
+                'email' => $owner->email,
+            ],
+        ];
     }
 
     private function redirectToClient(Client $client): RedirectResponse

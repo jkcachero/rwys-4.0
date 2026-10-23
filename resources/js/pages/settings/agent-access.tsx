@@ -30,35 +30,24 @@ const futureDateTime = () => {
 type ClientSummary = {
     id: string;
     name: string;
-    role: string;
-};
-
-type Permission = {
-    id: number;
-    is_active: boolean;
-    can_read: boolean;
-    can_publish: boolean;
-    can_schedule: boolean;
+    owner: {
+        name: string;
+        email: string;
+    } | null;
 };
 
 type Account = {
     id: string;
     name: string;
     platform: string;
-    is_active: boolean;
-    permission: Permission | null;
+    available: boolean;
 };
 
 type Profile = {
     id: string;
     name: string;
-    provider: string;
     synchronized_at: string | null;
     accounts: Account[];
-};
-
-type Capability = {
-    available: boolean;
 };
 
 type AgentToken = {
@@ -75,15 +64,12 @@ type AgentToken = {
 type SelectedClient = ClientSummary & {
     can_manage: boolean;
     can_assign_profiles: boolean;
-    approved_origins: string[];
     profiles: Profile[];
-    capabilities: Record<string, Capability>;
     tokens: AgentToken[];
 };
 
 type Ability = {
     value: string;
-    label: string;
 };
 
 type DiscoverableProfile = {
@@ -117,72 +103,16 @@ function formatDate(value: string | null) {
     return value === null ? 'Never' : new Date(value).toLocaleString();
 }
 
-function PermissionForm({
-    client,
-    account,
-}: {
-    client: SelectedClient;
-    account: Account;
-}) {
-    const permission = account.permission;
-    const { data, setData, patch, processing, errors } = useForm({
-        is_active: permission?.is_active ?? false,
-        can_read: permission?.can_read ?? false,
-        can_publish: permission?.can_publish ?? false,
-        can_schedule: permission?.can_schedule ?? false,
-    });
-
-    if (permission === null) {
-        return (
-            <p className="text-sm text-muted-foreground">
-                This account has not been approved for this Client.
-            </p>
-        );
-    }
-
-    const submit = (event: FormEvent) => {
-        event.preventDefault();
-        patch(
-            `/settings/agent-access/${client.id}/permissions/${permission.id}`,
-            { preserveScroll: true },
-        );
-    };
-
-    return (
-        <form className="space-y-3" onSubmit={submit}>
-            <div className="grid gap-3 sm:grid-cols-2">
-                {[
-                    ['is_active', 'Enabled'],
-                    ['can_read', 'Read'],
-                    ['can_publish', 'Publish'],
-                    ['can_schedule', 'Schedule'],
-                ].map(([field, label]) => (
-                    <label
-                        key={field}
-                        className="flex items-center gap-2 text-sm"
-                    >
-                        <Checkbox
-                            checked={data[field as keyof typeof data]}
-                            disabled={!client.can_manage || !account.is_active}
-                            onCheckedChange={(checked) =>
-                                setData(
-                                    field as keyof typeof data,
-                                    checked === true,
-                                )
-                            }
-                        />
-                        {label}
-                    </label>
-                ))}
-            </div>
-            <InputError message={errors.can_read} />
-            {client.can_manage && (
-                <Button size="sm" variant="outline" disabled={processing}>
-                    Save permissions
-                </Button>
-            )}
-        </form>
-    );
+function accessLabels(abilities: string[]) {
+    return [
+        abilities.some((ability) => ability.endsWith('.read')) ? 'Read' : null,
+        abilities.some((ability) => ability.endsWith('.publish'))
+            ? 'Publish'
+            : null,
+        abilities.some((ability) => ability.endsWith('.schedule'))
+            ? 'Schedule'
+            : null,
+    ].filter((label): label is string => label !== null);
 }
 
 function TokenCreationForm({
@@ -193,10 +123,37 @@ function TokenCreationForm({
     abilities: Ability[];
 }) {
     const accounts = client.profiles.flatMap((profile) => profile.accounts);
+    const accessOptions = [
+        {
+            label: 'Read',
+            description:
+                'View connected accounts, posts, analytics, and activity.',
+            abilities: abilities
+                .filter((ability) => ability.value.endsWith('.read'))
+                .map((ability) => ability.value),
+        },
+        {
+            label: 'Publish',
+            description: 'Publish approved content immediately.',
+            abilities: abilities
+                .filter((ability) => ability.value.endsWith('.publish'))
+                .map((ability) => ability.value),
+        },
+        {
+            label: 'Schedule',
+            description: 'Schedule approved content for later.',
+            abilities: abilities
+                .filter((ability) => ability.value.endsWith('.schedule'))
+                .map((ability) => ability.value),
+        },
+    ].filter((option) => option.abilities.length > 0);
+    const defaultAbilities =
+        accessOptions.find((option) => option.label === 'Read')?.abilities ??
+        [];
     const { data, setData, post, processing, errors, reset } =
         useForm<TokenForm>({
             name: '',
-            abilities: ['context.read'],
+            abilities: defaultAbilities,
             allowed_account_ids: [],
             expires_at: futureDateTime(),
         });
@@ -214,6 +171,15 @@ function TokenCreationForm({
         );
     };
 
+    const toggleAccess = (values: string[], checked: boolean) => {
+        setData(
+            'abilities',
+            checked
+                ? [...new Set([...data.abilities, ...values])]
+                : data.abilities.filter((ability) => !values.includes(ability)),
+        );
+    };
+
     const submit = (event: FormEvent) => {
         event.preventDefault();
         post(`/settings/agent-access/${client.id}/tokens`, {
@@ -225,16 +191,16 @@ function TokenCreationForm({
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Issue an agent token</CardTitle>
+                <CardTitle>Create secure access</CardTitle>
                 <CardDescription>
-                    Tokens are bound to this Client, have exact abilities, and
-                    expire within 90 days.
+                    Choose what this access can do and which connected accounts
+                    it may use. Access expires within 90 days.
                 </CardDescription>
             </CardHeader>
             <CardContent>
                 <form className="space-y-5" onSubmit={submit}>
                     <div className="grid gap-2">
-                        <Label htmlFor="token-name">Token name</Label>
+                        <Label htmlFor="token-name">Access name</Label>
                         <Input
                             id="token-name"
                             value={data.name}
@@ -248,42 +214,38 @@ function TokenCreationForm({
                     </div>
 
                     <fieldset className="space-y-2">
-                        <legend className="text-sm font-medium">
-                            Abilities
-                        </legend>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                            {abilities.map((ability) => {
-                                const available =
-                                    client.capabilities[ability.value]
-                                        ?.available ?? false;
-
-                                return (
-                                    <label
-                                        key={ability.value}
-                                        className="flex items-center gap-2 text-sm"
-                                    >
-                                        <Checkbox
-                                            checked={data.abilities.includes(
-                                                ability.value,
-                                            )}
-                                            disabled={!available}
-                                            onCheckedChange={(checked) =>
-                                                toggleValue(
-                                                    'abilities',
-                                                    ability.value,
-                                                    checked === true,
-                                                )
-                                            }
-                                        />
-                                        <span>{ability.label}</span>
-                                        {!available && (
-                                            <Badge variant="outline">
-                                                Unavailable
-                                            </Badge>
+                        <legend className="text-sm font-medium">Access</legend>
+                        <div className="grid gap-3 sm:grid-cols-3">
+                            {accessOptions.map((option) => (
+                                <label
+                                    key={option.label}
+                                    className="flex items-start gap-3 rounded-lg border p-3"
+                                >
+                                    <Checkbox
+                                        className="mt-0.5"
+                                        checked={option.abilities.every(
+                                            (ability) =>
+                                                data.abilities.includes(
+                                                    ability,
+                                                ),
                                         )}
-                                    </label>
-                                );
-                            })}
+                                        onCheckedChange={(checked) =>
+                                            toggleAccess(
+                                                option.abilities,
+                                                checked === true,
+                                            )
+                                        }
+                                    />
+                                    <span>
+                                        <span className="block text-sm font-medium">
+                                            {option.label}
+                                        </span>
+                                        <span className="block text-xs text-muted-foreground">
+                                            {option.description}
+                                        </span>
+                                    </span>
+                                </label>
+                            ))}
                         </div>
                         <InputError
                             message={errors.abilities ?? errors['abilities.0']}
@@ -301,12 +263,6 @@ function TokenCreationForm({
                         ) : (
                             <div className="grid gap-2">
                                 {accounts.map((account) => {
-                                    const readable =
-                                        account.is_active &&
-                                        account.permission?.is_active ===
-                                            true &&
-                                        account.permission.can_read;
-
                                     return (
                                         <label
                                             key={account.id}
@@ -316,7 +272,7 @@ function TokenCreationForm({
                                                 checked={data.allowed_account_ids.includes(
                                                     account.id,
                                                 )}
-                                                disabled={!readable}
+                                                disabled={!account.available}
                                                 onCheckedChange={(checked) =>
                                                     toggleValue(
                                                         'allowed_account_ids',
@@ -351,7 +307,7 @@ function TokenCreationForm({
                     <Button
                         disabled={processing || data.abilities.length === 0}
                     >
-                        Issue token
+                        Create access
                     </Button>
                 </form>
             </CardContent>
@@ -361,144 +317,158 @@ function TokenCreationForm({
 
 function ProfileAssignment({ client }: { client: SelectedClient }) {
     const [discovery, setDiscovery] = useState<ProfileDiscovery | null>(null);
+    const [selectedProfileId, setSelectedProfileId] = useState('');
     const [loading, setLoading] = useState(false);
+    const [assigning, setAssigning] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const loadProfiles = async (page: number) => {
+    const loadProfiles = async () => {
         setLoading(true);
         setError(null);
+        setSelectedProfileId('');
 
         try {
-            const response = await fetch(
-                discoverProfiles(client.id, { query: { page } }).url,
-                {
-                    credentials: 'same-origin',
-                    headers: { Accept: 'application/json' },
-                },
-            );
-            const payload = (await response.json()) as
-                | ProfileDiscovery
-                | { message?: string };
+            const profiles: DiscoverableProfile[] = [];
+            let page = 1;
+            let hasMore = true;
 
-            if (!response.ok || !('profiles' in payload)) {
-                throw new Error(
-                    'message' in payload && payload.message
-                        ? payload.message
-                        : 'Unable to load Zernio profiles.',
+            while (hasMore) {
+                const response = await fetch(
+                    discoverProfiles(client.id, { query: { page } }).url,
+                    {
+                        credentials: 'same-origin',
+                        headers: { Accept: 'application/json' },
+                    },
                 );
+                const payload = (await response.json()) as
+                    | ProfileDiscovery
+                    | { message?: string };
+
+                if (!response.ok || !('profiles' in payload)) {
+                    throw new Error(
+                        'message' in payload && payload.message
+                            ? payload.message
+                            : 'Unable to load profiles.',
+                    );
+                }
+
+                profiles.push(...payload.profiles);
+                hasMore = payload.has_more;
+                page += 1;
             }
 
-            setDiscovery(payload);
+            setDiscovery({ profiles, page: 1, has_more: false });
         } catch (discoveryError) {
             setError(
                 discoveryError instanceof Error
                     ? discoveryError.message
-                    : 'Unable to load Zernio profiles.',
+                    : 'Unable to load profiles.',
             );
         } finally {
             setLoading(false);
         }
     };
 
+    const assignSelectedProfile = () => {
+        if (selectedProfileId === '') {
+            return;
+        }
+
+        router.post(
+            assignProfile(client.id).url,
+            { provider_profile_id: selectedProfileId },
+            {
+                preserveScroll: true,
+                onStart: () => {
+                    setAssigning(true);
+                    setError(null);
+                },
+                onFinish: () => setAssigning(false),
+                onError: (errors) =>
+                    setError(
+                        errors.provider_profile_id ??
+                            'Unable to assign this profile.',
+                    ),
+            },
+        );
+    };
+
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Assign a Zernio profile</CardTitle>
+                <CardTitle>Assign a profile</CardTitle>
                 <CardDescription>
-                    Load profiles from your connected Zernio account, then
-                    assign one complete profile and its accounts to this Client.
+                    Load the available profiles, choose one, and assign it to
+                    the selected user.
                 </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="flex flex-wrap gap-2">
-                    {discovery === null && (
+            <CardContent className="space-y-5">
+                <div className="space-y-2">
+                    <p className="text-sm font-medium">
+                        Step 2 — Load available profiles
+                    </p>
+                    <div className="flex flex-wrap gap-2">
                         <Button
                             type="button"
                             variant="outline"
                             disabled={loading}
-                            onClick={() => loadProfiles(1)}
+                            onClick={loadProfiles}
                         >
-                            {loading
-                                ? 'Loading profiles…'
-                                : 'Load Zernio profiles'}
+                            {loading ? 'Loading profiles…' : 'Load profiles'}
                         </Button>
-                    )}
-                    <Button asChild type="button" variant="ghost">
-                        <Link href="/settings/connections">
-                            Manage Zernio connection
-                        </Link>
-                    </Button>
+                        <Button asChild type="button" variant="ghost">
+                            <Link href="/settings/connections">
+                                Connection settings
+                            </Link>
+                        </Button>
+                    </div>
                 </div>
 
-                {discovery === null ? null : discovery.profiles.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                        No Zernio profiles are available on this page.
-                    </p>
-                ) : (
+                {discovery !== null && (
                     <div className="space-y-3">
-                        {discovery.profiles.map((profile) => (
-                            <div
-                                key={profile.id}
-                                className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
-                            >
-                                <div>
-                                    <p className="font-medium">
-                                        {profile.name}
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">
-                                        {profile.account_count === null
-                                            ? 'Account count unavailable'
-                                            : `${profile.account_count} account${profile.account_count === 1 ? '' : 's'}`}
-                                    </p>
-                                </div>
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    onClick={() =>
-                                        router.post(
-                                            assignProfile(client.id).url,
-                                            {
-                                                provider_profile_id: profile.id,
-                                            },
-                                            {
-                                                preserveScroll: true,
-                                                onStart: () => setError(null),
-                                                onError: (errors) =>
-                                                    setError(
-                                                        errors.provider_profile_id ??
-                                                            'Unable to assign this Zernio profile.',
-                                                    ),
-                                            },
-                                        )
+                        <Label htmlFor="profile-assignment">
+                            Step 3 — Choose a profile
+                        </Label>
+                        {discovery.profiles.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                                No profiles are available.
+                            </p>
+                        ) : (
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                                <select
+                                    id="profile-assignment"
+                                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                    value={selectedProfileId}
+                                    onChange={(event) =>
+                                        setSelectedProfileId(event.target.value)
                                     }
                                 >
-                                    Assign profile
+                                    <option value="">Select a profile</option>
+                                    {discovery.profiles.map((profile) => (
+                                        <option
+                                            key={profile.id}
+                                            value={profile.id}
+                                        >
+                                            {profile.name}
+                                            {profile.account_count === null
+                                                ? ''
+                                                : ` (${profile.account_count} account${profile.account_count === 1 ? '' : 's'})`}
+                                        </option>
+                                    ))}
+                                </select>
+                                <Button
+                                    type="button"
+                                    disabled={
+                                        assigning || selectedProfileId === ''
+                                    }
+                                    onClick={assignSelectedProfile}
+                                >
+                                    {assigning
+                                        ? 'Assigning…'
+                                        : 'Assign profile'}
                                 </Button>
                             </div>
-                        ))}
-                    </div>
-                )}
-
-                {discovery !== null && (
-                    <div className="flex gap-2">
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={loading || discovery.page === 1}
-                            onClick={() => loadProfiles(discovery.page - 1)}
-                        >
-                            Previous
-                        </Button>
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={loading || !discovery.has_more}
-                            onClick={() => loadProfiles(discovery.page + 1)}
-                        >
-                            Next
-                        </Button>
+                        )}
                     </div>
                 )}
 
@@ -519,15 +489,15 @@ function PlaintextToken({ token, notice }: { token: string; notice?: string }) {
     return (
         <Card className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
             <CardHeader>
-                <CardTitle>Copy your new token</CardTitle>
+                <CardTitle>Copy your new access key</CardTitle>
                 <CardDescription>
-                    {notice ?? 'This plaintext token will only be shown once.'}
+                    {notice ?? 'This access key will only be shown once.'}
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-                <Input aria-label="New agent token" readOnly value={token} />
+                <Input aria-label="New access key" readOnly value={token} />
                 <Button type="button" variant="outline" onClick={copy}>
-                    {copied ? 'Copied' : 'Copy token'}
+                    {copied ? 'Copied' : 'Copy access key'}
                 </Button>
             </CardContent>
         </Card>
@@ -550,38 +520,52 @@ export default function AgentAccess({
                 <Heading
                     variant="small"
                     title="Agent access"
-                    description="Manage Client-scoped accounts, capabilities, and API tokens for external agents."
+                    description="Assign connected profiles and create secure access for registered users."
                 />
 
-                {clients.length > 1 && (
-                    <div className="flex flex-wrap gap-2">
-                        {clients.map((client) => (
-                            <Button
-                                key={client.id}
-                                variant={
-                                    selectedClient?.id === client.id
-                                        ? 'default'
-                                        : 'outline'
+                {clients.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>
+                                Step 1 — Select a registered user
+                            </CardTitle>
+                            <CardDescription>
+                                Choose the user who should receive profile
+                                access.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <select
+                                aria-label="Registered user"
+                                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                value={selectedClient?.id ?? ''}
+                                onChange={(event) =>
+                                    router.get(
+                                        '/settings/agent-access',
+                                        { client: event.target.value },
+                                        { preserveState: true },
+                                    )
                                 }
-                                size="sm"
-                                asChild
                             >
-                                <Link
-                                    href={`/settings/agent-access?client=${client.id}`}
-                                >
-                                    {client.name}
-                                </Link>
-                            </Button>
-                        ))}
-                    </div>
+                                {clients.map((client) => (
+                                    <option key={client.id} value={client.id}>
+                                        {client.owner === null
+                                            ? client.name
+                                            : `${client.owner.name} — ${client.owner.email}`}
+                                    </option>
+                                ))}
+                            </select>
+                        </CardContent>
+                    </Card>
                 )}
 
                 {selectedClient === null ? (
                     <Card>
                         <CardHeader>
-                            <CardTitle>No Agent Access Clients</CardTitle>
+                            <CardTitle>No registered users available</CardTitle>
                             <CardDescription>
-                                You do not have an active Client membership.
+                                There are no eligible users available for access
+                                setup.
                             </CardDescription>
                         </CardHeader>
                     </Card>
@@ -589,72 +573,17 @@ export default function AgentAccess({
                     <>
                         <Card>
                             <CardHeader>
-                                <div className="flex items-start justify-between gap-4">
-                                    <div className="space-y-1">
-                                        <CardTitle>
-                                            {selectedClient.name}
-                                        </CardTitle>
-                                        <CardDescription>
-                                            Role: {selectedClient.role}
-                                        </CardDescription>
-                                    </div>
-                                    <Badge
-                                        variant={
-                                            selectedClient.can_manage
-                                                ? 'default'
-                                                : 'outline'
-                                        }
-                                    >
-                                        {selectedClient.can_manage
-                                            ? 'Can manage'
-                                            : 'Read only'}
-                                    </Badge>
-                                </div>
+                                <CardTitle>
+                                    {selectedClient.owner?.name ??
+                                        selectedClient.name}
+                                </CardTitle>
+                                <CardDescription>
+                                    {selectedClient.owner?.email ??
+                                        'Registered user'}
+                                    {' · '}
+                                    {selectedClient.name}
+                                </CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div>
-                                    <p className="text-sm font-medium">
-                                        Approved origins
-                                    </p>
-                                    {selectedClient.approved_origins.length ===
-                                    0 ? (
-                                        <p className="text-sm text-muted-foreground">
-                                            No browser origins are approved.
-                                        </p>
-                                    ) : (
-                                        <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                                            {selectedClient.approved_origins.map(
-                                                (origin) => (
-                                                    <li key={origin}>
-                                                        {origin}
-                                                    </li>
-                                                ),
-                                            )}
-                                        </ul>
-                                    )}
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                    {abilities.map((ability) => (
-                                        <Badge
-                                            key={ability.value}
-                                            variant={
-                                                selectedClient.capabilities[
-                                                    ability.value
-                                                ]?.available
-                                                    ? 'secondary'
-                                                    : 'outline'
-                                            }
-                                        >
-                                            {ability.label}:{' '}
-                                            {selectedClient.capabilities[
-                                                ability.value
-                                            ]?.available
-                                                ? 'available'
-                                                : 'unavailable'}
-                                        </Badge>
-                                    ))}
-                                </div>
-                            </CardContent>
                         </Card>
 
                         {token_plaintext && (
@@ -665,21 +594,24 @@ export default function AgentAccess({
                         )}
 
                         {selectedClient.can_assign_profiles && (
-                            <ProfileAssignment client={selectedClient} />
+                            <ProfileAssignment
+                                key={selectedClient.id}
+                                client={selectedClient}
+                            />
                         )}
 
                         <div className="space-y-4">
                             <Heading
                                 variant="small"
-                                title="Provider accounts"
-                                description="Review synchronized accounts and the permissions granted to this Client."
+                                title="Connected accounts"
+                                description="Accounts available to the selected user."
                             />
                             {selectedClient.profiles.length === 0 ? (
                                 <Card>
                                     <CardContent>
                                         <p className="text-sm text-muted-foreground">
-                                            No provider profile is assigned to
-                                            this Client.
+                                            No profile has been assigned to this
+                                            user yet.
                                         </p>
                                     </CardContent>
                                 </Card>
@@ -710,13 +642,12 @@ export default function AgentAccess({
                                                             )
                                                         }
                                                     >
-                                                        Sync accounts
+                                                        Refresh accounts
                                                     </Button>
                                                 )}
                                             </div>
                                             <CardDescription>
-                                                {profile.provider} · Last
-                                                synchronized:{' '}
+                                                Last updated:{' '}
                                                 {formatDate(
                                                     profile.synchronized_at,
                                                 )}
@@ -741,20 +672,16 @@ export default function AgentAccess({
                                                         </div>
                                                         <Badge
                                                             variant={
-                                                                account.is_active
+                                                                account.available
                                                                     ? 'secondary'
                                                                     : 'outline'
                                                             }
                                                         >
-                                                            {account.is_active
-                                                                ? 'Active'
-                                                                : 'Inactive'}
+                                                            {account.available
+                                                                ? 'Available'
+                                                                : 'Unavailable'}
                                                         </Badge>
                                                     </div>
-                                                    <PermissionForm
-                                                        client={selectedClient}
-                                                        account={account}
-                                                    />
                                                 </div>
                                             ))}
                                         </CardContent>
@@ -772,17 +699,17 @@ export default function AgentAccess({
 
                         <Card>
                             <CardHeader>
-                                <CardTitle>Issued tokens</CardTitle>
+                                <CardTitle>Secure access</CardTitle>
                                 <CardDescription>
-                                    Plaintext values are never displayed after
-                                    issuance or rotation.
+                                    Access keys are shown once when created or
+                                    replaced.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 {selectedClient.tokens.length === 0 ? (
                                     <p className="text-sm text-muted-foreground">
-                                        No tokens have been issued for this
-                                        Client.
+                                        No secure access has been created for
+                                        this user.
                                     </p>
                                 ) : (
                                     selectedClient.tokens.map((token) => (
@@ -818,20 +745,20 @@ export default function AgentAccess({
                                                 >
                                                     {token.revoked_at === null
                                                         ? 'Active'
-                                                        : 'Revoked'}
+                                                        : 'Disabled'}
                                                 </Badge>
                                             </div>
                                             <div className="flex flex-wrap gap-2">
-                                                {token.abilities.map(
-                                                    (ability) => (
-                                                        <Badge
-                                                            key={ability}
-                                                            variant="outline"
-                                                        >
-                                                            {ability}
-                                                        </Badge>
-                                                    ),
-                                                )}
+                                                {accessLabels(
+                                                    token.abilities,
+                                                ).map((label) => (
+                                                    <Badge
+                                                        key={label}
+                                                        variant="outline"
+                                                    >
+                                                        {label}
+                                                    </Badge>
+                                                ))}
                                             </div>
                                             {selectedClient.can_manage &&
                                                 token.revoked_at === null && (
@@ -856,7 +783,7 @@ export default function AgentAccess({
                                                                 )
                                                             }
                                                         >
-                                                            Rotate
+                                                            Replace access key
                                                         </Button>
                                                         <Button
                                                             type="button"
@@ -871,7 +798,7 @@ export default function AgentAccess({
                                                                 )
                                                             }
                                                         >
-                                                            Revoke
+                                                            Disable
                                                         </Button>
                                                     </div>
                                                 )}

@@ -51,14 +51,16 @@ class AgentProfileAssignmentTest extends TestCase
 
     public function test_operator_grant_exposes_the_client_and_assignment_controls_without_owner_token_controls(): void
     {
-        [$operator, $client] = $this->operatorAndClient();
+        [$operator, $client, $owner] = $this->operatorAndClient();
 
         $this->actingAs($operator)
             ->get(route('settings.agent-access.edit'))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('clients.0.id', $client->public_id)
-                ->where('clients.0.role', 'operator')
+                ->where('clients.0.owner.name', $owner->name)
+                ->where('clients.0.owner.email', $owner->email)
+                ->missing('clients.0.role')
                 ->where('selectedClient.id', $client->public_id)
                 ->where('selectedClient.can_assign_profiles', true)
                 ->where('selectedClient.can_manage', false)
@@ -304,7 +306,7 @@ class AgentProfileAssignmentTest extends TestCase
         $this->assertFalse($newPermission->can_publish);
     }
 
-    /** @return array{User, Client} */
+    /** @return array{User, Client, User} */
     private function operatorAndClient(bool $granted = true): array
     {
         $operator = User::factory()->create([
@@ -324,7 +326,7 @@ class AgentProfileAssignmentTest extends TestCase
             ]);
         }
 
-        return [$operator, $client];
+        return [$operator, $client, $owner];
     }
 
     private function zernioConnection(User $operator): ProviderConnection

@@ -20,8 +20,14 @@ class AgentAccessManagementTest extends TestCase
     public function test_active_client_members_can_view_only_their_agent_access_clients(): void
     {
         $user = User::factory()->create(['email_verified_at' => now()]);
+        $owner = User::factory()->create([
+            'name' => 'Acme Owner',
+            'email' => 'owner@example.com',
+            'email_verified_at' => now(),
+        ]);
         $client = Client::factory()->create(['name' => 'Acme']);
         $otherClient = Client::factory()->create(['name' => 'Other']);
+        $client->users()->attach($owner, ['role' => 'owner', 'is_active' => true]);
         $client->users()->attach($user, ['role' => 'member', 'is_active' => true]);
         $otherClient->users()->attach(User::factory()->create(), ['role' => 'owner', 'is_active' => true]);
 
@@ -46,17 +52,24 @@ class AgentAccessManagementTest extends TestCase
                 ->component('settings/agent-access')
                 ->has('clients', 1)
                 ->where('clients.0.name', 'Acme')
+                ->where('clients.0.owner.name', 'Acme Owner')
+                ->where('clients.0.owner.email', 'owner@example.com')
                 ->where('selectedClient.name', 'Acme')
                 ->where('selectedClient.can_manage', false)
                 ->where('selectedClient.profiles.0.name', 'Acme Social')
                 ->where('selectedClient.profiles.0.accounts.0.name', 'Acme LinkedIn')
+                ->where('selectedClient.profiles.0.accounts.0.available', true)
                 ->where('abilities', [
-                    ['value' => AgentAbility::ContextRead->value, 'label' => 'Context Read'],
-                    ['value' => AgentAbility::AccountsRead->value, 'label' => 'Zernio Accounts Read'],
-                    ['value' => AgentAbility::PostsRead->value, 'label' => 'Zernio Posts Read'],
-                    ['value' => AgentAbility::AnalyticsRead->value, 'label' => 'Zernio Analytics Read'],
-                    ['value' => AgentAbility::OperationsRead->value, 'label' => 'Operations Read'],
+                    ['value' => AgentAbility::ContextRead->value],
+                    ['value' => AgentAbility::AccountsRead->value],
+                    ['value' => AgentAbility::PostsRead->value],
+                    ['value' => AgentAbility::AnalyticsRead->value],
+                    ['value' => AgentAbility::OperationsRead->value],
                 ])
+                ->missing('selectedClient.approved_origins')
+                ->missing('selectedClient.capabilities')
+                ->missing('selectedClient.profiles.0.provider')
+                ->missing('selectedClient.profiles.0.accounts.0.permission')
                 ->missing('token_plaintext'));
     }
 

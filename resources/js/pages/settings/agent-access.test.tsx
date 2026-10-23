@@ -9,6 +9,7 @@ vi.mock('@inertiajs/react', () => ({
     ),
     router: {
         delete: vi.fn(),
+        get: vi.fn(),
         post: vi.fn(),
     },
     useForm: <T extends object>(initialData: T) => ({
@@ -27,25 +28,23 @@ import AgentAccess from './agent-access';
 const selectedClient = {
     id: 'client-123',
     name: 'Acme',
-    role: 'owner',
+    owner: {
+        name: 'John Karlo',
+        email: 'john@example.com',
+    },
     can_manage: true,
     can_assign_profiles: false,
-    approved_origins: ['https://agents.example.com'],
     profiles: [],
-    capabilities: {
-        'context.read': { available: true },
-        'zernio.accounts.read': { available: true },
-    },
     tokens: [],
 };
 
 const abilities = [
-    { value: 'context.read', label: 'Context read' },
-    { value: 'zernio.accounts.read', label: 'Zernio accounts read' },
+    { value: 'context.read' },
+    { value: 'zernio.accounts.read' },
 ];
 
 describe('Agent access settings', () => {
-    it('renders a useful empty state without a client membership', () => {
+    it('renders a user-focused empty state without an eligible user', () => {
         const markup = renderToStaticMarkup(
             <AgentAccess
                 clients={[]}
@@ -54,37 +53,40 @@ describe('Agent access settings', () => {
             />,
         );
 
-        expect(markup).toContain('No Agent Access Clients');
-        expect(markup).toContain('active Client membership');
+        expect(markup).toContain('No registered users available');
+        expect(markup).toContain('no eligible users');
         expect(markup).not.toContain('Issue an agent token');
     });
 
-    it('shows scoped management state and one-time token plaintext', () => {
+    it('shows registered-user access without provider or internal settings', () => {
         const markup = renderToStaticMarkup(
             <AgentAccess
                 clients={[selectedClient]}
                 selectedClient={selectedClient}
                 abilities={abilities}
                 token_plaintext="secret-token"
-                token_notice="Store this token now."
+                token_notice="Store this key now."
             />,
         );
 
-        expect(markup).toContain('Acme');
-        expect(markup).toContain('https://agents.example.com');
-        expect(markup).toContain('Context read: available');
-        expect(markup).toContain('No provider profile is assigned');
-        expect(markup).toContain('Issue an agent token');
-        expect(markup).toContain('Store this token now.');
+        expect(markup).toContain('Step 1 — Select a registered user');
+        expect(markup).toContain('John Karlo');
+        expect(markup).toContain('john@example.com');
+        expect(markup).toContain('No profile has been assigned');
+        expect(markup).toContain('Create secure access');
+        expect(markup).toContain('Read');
+        expect(markup).toContain('Store this key now.');
         expect(markup).toContain('secret-token');
-        expect(markup).toContain('No tokens have been issued');
-        expect(markup).not.toContain('Load Zernio profiles');
+        expect(markup).toContain('No secure access has been created');
+        expect(markup).not.toContain('Zernio');
+        expect(markup).not.toContain('Approved origins');
+        expect(markup).not.toContain('capabilit');
+        expect(markup).not.toContain('Context read');
     });
 
-    it('shows assignment controls to an authorized operator without owner token controls', () => {
+    it('shows a simple profile assignment flow to an authorized operator', () => {
         const operatorClient = {
             ...selectedClient,
-            role: 'operator',
             can_manage: false,
             can_assign_profiles: true,
         };
@@ -96,10 +98,12 @@ describe('Agent access settings', () => {
             />,
         );
 
-        expect(markup).toContain('Assign a Zernio profile');
-        expect(markup).toContain('Load Zernio profiles');
-        expect(markup).toContain('Manage Zernio connection');
-        expect(markup).toContain('href="/settings/connections"');
-        expect(markup).not.toContain('Issue an agent token');
+        expect(markup).toContain('Step 1 — Select a registered user');
+        expect(markup).toContain('Assign a profile');
+        expect(markup).toContain('Step 2 — Load available profiles');
+        expect(markup).toContain('Load profiles');
+        expect(markup).toContain('Connection settings');
+        expect(markup).not.toContain('Create secure access');
+        expect(markup).not.toContain('Zernio');
     });
 });
