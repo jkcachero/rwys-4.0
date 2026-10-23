@@ -59,13 +59,7 @@ class AgentAccessManagementTest extends TestCase
                 ->where('selectedClient.profiles.0.name', 'Acme Social')
                 ->where('selectedClient.profiles.0.accounts.0.name', 'Acme LinkedIn')
                 ->where('selectedClient.profiles.0.accounts.0.available', true)
-                ->where('abilities', [
-                    ['value' => AgentAbility::ContextRead->value],
-                    ['value' => AgentAbility::AccountsRead->value],
-                    ['value' => AgentAbility::PostsRead->value],
-                    ['value' => AgentAbility::AnalyticsRead->value],
-                    ['value' => AgentAbility::OperationsRead->value],
-                ])
+                ->missing('abilities')
                 ->missing('selectedClient.approved_origins')
                 ->missing('selectedClient.capabilities')
                 ->missing('selectedClient.profiles.0.provider')
@@ -136,7 +130,6 @@ class AgentAccessManagementTest extends TestCase
             ->withSession(['auth.password_confirmed_at' => time()])
             ->post(route('settings.agent-access.tokens.store', $client), [
                 'name' => 'Codex',
-                'abilities' => [AgentAbility::ContextRead->value, AgentAbility::AccountsRead->value],
                 'allowed_account_ids' => [$account->public_id],
                 'expires_at' => now()->addDays(30)->toDateTimeString(),
             ])->assertRedirect();
@@ -145,6 +138,7 @@ class AgentAccessManagementTest extends TestCase
         $issueResponse->assertSessionHas('agent_token_plaintext');
         $this->assertSame($client->id, $issuedToken->client_id);
         $this->assertSame($owner->id, $issuedToken->issued_by);
+        $this->assertSame(AgentAbility::clientTokenDefaults(), $issuedToken->abilities);
         $this->assertSame([$account->public_id], $issuedToken->allowed_account_ids);
         $this->assertNotNull($issuedToken->expires_at);
 
@@ -155,7 +149,6 @@ class AgentAccessManagementTest extends TestCase
                 'token' => $issuedToken,
             ]), [
                 'name' => 'Codex broadened',
-                'abilities' => [AgentAbility::ContextRead->value],
                 'allowed_account_ids' => [],
             ])->assertSessionHasErrors('allowed_account_ids');
 
@@ -169,7 +162,6 @@ class AgentAccessManagementTest extends TestCase
                 'token' => $issuedToken,
             ]), [
                 'name' => 'Codex rotated',
-                'abilities' => [AgentAbility::ContextRead->value],
                 'allowed_account_ids' => [$account->public_id],
             ])->assertRedirect()->assertSessionHas('agent_token_plaintext');
 
@@ -189,7 +181,7 @@ class AgentAccessManagementTest extends TestCase
         $this->assertDatabaseCount('personal_access_tokens', 2);
     }
 
-    public function test_token_management_rejects_unapproved_accounts_and_unknown_abilities(): void
+    public function test_token_management_rejects_unapproved_accounts_and_ignores_legacy_ability_input(): void
     {
         $owner = User::factory()->create(['email_verified_at' => now()]);
         $client = Client::factory()->create();
@@ -203,7 +195,7 @@ class AgentAccessManagementTest extends TestCase
                 'abilities' => ['admin:*'],
                 'allowed_account_ids' => [$otherAccount->public_id],
                 'expires_at' => now()->addDays(30)->toDateTimeString(),
-            ])->assertSessionHasErrors(['abilities.0', 'allowed_account_ids']);
+            ])->assertSessionHasErrors('allowed_account_ids');
 
         $this->assertDatabaseCount('personal_access_tokens', 0);
     }

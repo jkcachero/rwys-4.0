@@ -35,9 +35,9 @@ class AgentWriteApiTest extends TestCase
         Http::preventStrayRequests();
     }
 
-    public function test_immediate_publish_is_durable_permanently_idempotent_and_never_blindly_replayed(): void
+    public function test_immediate_publish_delegates_platform_support_and_is_durable_permanently_idempotent(): void
     {
-        [$token, , $account, $profile] = $this->writeContext('linkedin', AgentAbility::PostsPublish);
+        [$token, , $account, $profile] = $this->writeContext('instagram', AgentAbility::PostsPublish);
         $providerPostId = '0123456789abcdef01234567';
 
         Http::fake(function (Request $request) use ($account, $profile, $providerPostId) {
@@ -45,22 +45,25 @@ class AgentWriteApiTest extends TestCase
 
             return match ($path) {
                 '/api/v1/profiles/'.$profile->provider_id => Http::response(['profile' => ['_id' => $profile->provider_id]]),
-                '/api/v1/accounts/'.$account->provider_id => Http::response(['account' => [
-                    '_id' => $account->provider_id,
-                    'profileId' => $profile->provider_id,
-                    'isActive' => true,
-                    'status' => 'connected',
-                ]]),
+                '/api/v1/accounts' => Http::response([
+                    'accounts' => [[
+                        '_id' => $account->provider_id,
+                        'profileId' => $profile->provider_id,
+                        'isActive' => true,
+                        'status' => 'connected',
+                    ]],
+                    'pagination' => ['page' => 1, 'limit' => 100, 'total' => 1, 'pages' => 1],
+                ]),
                 '/api/v1/posts' => Http::response(['post' => [
                     '_id' => $providerPostId,
                     'accountIds' => [$account->provider_id],
                     'content' => 'Ship the verified update.',
-                    'platforms' => ['linkedin'],
+                    'platforms' => ['instagram'],
                     'status' => 'published',
                     'platformPosts' => [[
-                        'platform' => 'linkedin',
+                        'platform' => 'instagram',
                         'status' => 'published',
-                        'url' => 'https://www.linkedin.com/feed/update/example',
+                        'url' => 'https://www.instagram.com/p/example',
                     ]],
                 ]], 201),
                 default => Http::response([], 500),
@@ -174,12 +177,15 @@ class AgentWriteApiTest extends TestCase
 
             return match ($path) {
                 '/api/v1/profiles/'.$profile->provider_id => Http::response(['profile' => ['_id' => $profile->provider_id]]),
-                '/api/v1/accounts/'.$account->provider_id => Http::response(['account' => [
-                    '_id' => $account->provider_id,
-                    'profileId' => ['_id' => $profile->provider_id],
-                    'isActive' => true,
-                    'status' => 'connected',
-                ]]),
+                '/api/v1/accounts' => Http::response([
+                    'accounts' => [[
+                        '_id' => $account->provider_id,
+                        'profileId' => ['_id' => $profile->provider_id],
+                        'isActive' => true,
+                        'status' => 'connected',
+                    ]],
+                    'pagination' => ['page' => 1, 'limit' => 100, 'total' => 1, 'pages' => 1],
+                ]),
                 '/api/v1/media/upload-direct' => Http::response([
                     'url' => $uploadUrl,
                     'filename' => 'private-upload-id.jpg',
@@ -285,7 +291,8 @@ class AgentWriteApiTest extends TestCase
             'can_publish' => $ability === AgentAbility::PostsPublish,
             'can_schedule' => $ability === AgentAbility::PostsSchedule,
         ]);
-        $token = app(AgentTokenService::class)->issue($owner, $client, 'Write test', [$ability->value], null, [$account->public_id]);
+        $token = app(AgentTokenService::class)->issue($owner, $client, 'Write test', null, [$account->public_id]);
+        $token->accessToken->forceFill(['abilities' => [$ability->value]])->save();
 
         return [$token->plainTextToken, $client, $account, $profile];
     }

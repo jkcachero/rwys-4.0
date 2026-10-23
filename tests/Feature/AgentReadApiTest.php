@@ -58,7 +58,6 @@ class AgentReadApiTest extends TestCase
             $owner,
             $client,
             'Restricted agent',
-            [AgentAbility::AccountsRead->value],
             null,
             [$allowed->public_id],
         );
@@ -97,7 +96,8 @@ class AgentReadApiTest extends TestCase
         $owner = User::factory()->create();
         $client = Client::factory()->create(['approved_origins' => ['https://agent.example']]);
         $client->users()->attach($owner, ['role' => 'owner', 'is_active' => true]);
-        $token = app(AgentTokenService::class)->issue($owner, $client, 'Test agent', $abilities);
+        $token = app(AgentTokenService::class)->issue($owner, $client, 'Test agent');
+        $token->accessToken->forceFill(['abilities' => $abilities])->save();
 
         return [$token->plainTextToken, $client];
     }

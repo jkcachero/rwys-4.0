@@ -38,19 +38,10 @@ const selectedClient = {
     tokens: [],
 };
 
-const abilities = [
-    { value: 'context.read' },
-    { value: 'zernio.accounts.read' },
-];
-
 describe('Agent access settings', () => {
     it('renders a user-focused empty state without an eligible user', () => {
         const markup = renderToStaticMarkup(
-            <AgentAccess
-                clients={[]}
-                selectedClient={null}
-                abilities={abilities}
-            />,
+            <AgentAccess clients={[]} selectedClient={null} />,
         );
 
         expect(markup).toContain('No registered users available');
@@ -63,7 +54,6 @@ describe('Agent access settings', () => {
             <AgentAccess
                 clients={[selectedClient]}
                 selectedClient={selectedClient}
-                abilities={abilities}
                 token_plaintext="secret-token"
                 token_notice="Store this key now."
             />,
@@ -74,7 +64,7 @@ describe('Agent access settings', () => {
         expect(markup).toContain('john@example.com');
         expect(markup).toContain('No profile has been assigned');
         expect(markup).toContain('Create secure access');
-        expect(markup).toContain('Read');
+        expect(markup).toContain('Access can read and publish');
         expect(markup).toContain('Store this key now.');
         expect(markup).toContain('secret-token');
         expect(markup).toContain('No secure access has been created');
@@ -94,7 +84,6 @@ describe('Agent access settings', () => {
             <AgentAccess
                 clients={[operatorClient]}
                 selectedClient={operatorClient}
-                abilities={abilities}
             />,
         );
 

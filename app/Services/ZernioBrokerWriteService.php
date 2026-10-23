@@ -19,7 +19,10 @@ use Illuminate\Support\Facades\Storage;
 
 class ZernioBrokerWriteService
 {
-    public function __construct(private readonly ZernioHttpClient $zernio) {}
+    public function __construct(
+        private readonly ZernioHttpClient $zernio,
+        private readonly ZernioAccountLookupService $accounts,
+    ) {}
 
     public function publish(
         Request $request,
@@ -32,10 +35,6 @@ class ZernioBrokerWriteService
         }
 
         [$client, $token, $account, $profile] = $this->authorizedContext($request, $account, 'can_publish');
-
-        if (! in_array($account->platform, ['linkedin', 'facebook', 'threads', 'bluesky'], true)) {
-            throw new ZernioRequestException('This account does not support immediate text publishing.', 422, 'unsupported_platform');
-        }
 
         $intent = [
             'account_id' => $account->public_id,
@@ -246,13 +245,9 @@ class ZernioBrokerWriteService
             throw new ZernioRequestException('Zernio profile identity could not be verified.');
         }
 
-        $accountPayload = Arr::get($this->zernio->account($profile, $account->provider_id)->data, 'account');
-        $profileId = Arr::get($accountPayload, 'profileId._id', Arr::get($accountPayload, 'profileId'));
+        $accountPayload = $this->accounts->find($profile, $account);
 
-        if (! is_array($accountPayload)
-            || Arr::get($accountPayload, '_id') !== $account->provider_id
-            || $profileId !== $profile->provider_id
-            || Arr::get($accountPayload, 'isActive') !== true) {
+        if (Arr::get($accountPayload, 'isActive') !== true) {
             throw new ZernioRequestException('Zernio account identity could not be verified.');
         }
     }

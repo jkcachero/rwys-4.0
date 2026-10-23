@@ -2,11 +2,9 @@
 
 namespace App\Http\Requests\Settings;
 
-use App\Enums\AgentAbility;
 use App\Models\Client;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class IssueAgentTokenRequest extends FormRequest
@@ -26,8 +24,6 @@ class IssueAgentTokenRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:100'],
-            'abilities' => ['required', 'array', 'min:1'],
-            'abilities.*' => ['required', 'string', 'distinct', Rule::in(AgentAbility::enabled())],
             'allowed_account_ids' => ['present', 'array', 'max:300'],
             'allowed_account_ids.*' => ['required', 'uuid', 'distinct'],
             'expires_at' => [
@@ -66,17 +62,6 @@ class IssueAgentTokenRequest extends FormRequest
                 );
             }
 
-            $abilities = $this->input('abilities', []);
-
-            if (in_array(AgentAbility::PostsPublish->value, $abilities, true)
-                && ! $permissions->contains('can_publish', true)) {
-                $validator->errors()->add('abilities', 'Publishing requires a selected account with publish permission.');
-            }
-
-            if (in_array(AgentAbility::PostsSchedule->value, $abilities, true)
-                && ! $permissions->contains('can_schedule', true)) {
-                $validator->errors()->add('abilities', 'Scheduling requires a selected account with schedule permission.');
-            }
         }];
     }
 }

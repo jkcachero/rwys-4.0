@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AgentAbility;
 use Illuminate\Routing\Route;
 use Symfony\Component\Yaml\Yaml;
 use Tests\TestCase;
@@ -56,6 +57,10 @@ class AgentOpenApiContractTest extends TestCase
         $this->assertCount($operationIds->count(), $operationIds->unique());
         $this->assertSame('3.1.0', $contract['openapi']);
         $this->assertSame('/api/v1', $contract['servers'][0]['url']);
+        $this->assertSame(
+            AgentAbility::clientTokenDefaults(),
+            $contract['components']['schemas']['Ability']['enum'],
+        );
     }
 
     public function test_openapi_success_and_error_schemas_are_strict(): void

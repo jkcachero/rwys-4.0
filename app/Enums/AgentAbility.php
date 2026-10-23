@@ -31,32 +31,11 @@ enum AgentAbility: string
     }
 
     /** @return list<string> */
-    public static function enabled(): array
+    public static function clientTokenDefaults(): array
     {
-        $abilities = self::readOnly();
-
-        if (config('services.zernio.publish_enabled')) {
-            $abilities[] = self::PostsPublish->value;
-        }
-
-        if (config('services.zernio.schedule_enabled')) {
-            $abilities[] = self::PostsSchedule->value;
-        }
-
-        return $abilities;
-    }
-
-    /** @param list<string> $abilities */
-    public static function validate(array $abilities): array
-    {
-        $allowed = array_column(self::cases(), 'value');
-
-        foreach ($abilities as $ability) {
-            if (! in_array($ability, $allowed, true)) {
-                throw new \InvalidArgumentException("Unknown agent ability [{$ability}].");
-            }
-        }
-
-        return array_values(array_unique($abilities));
+        return [
+            ...self::readOnly(),
+            self::PostsPublish->value,
+        ];
     }
 }
