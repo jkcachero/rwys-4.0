@@ -83,7 +83,7 @@ class ZernioHttpClient
             fn (PendingRequest $request): Response => $request
                 ->withHeader('Idempotency-Key', $idempotencyKey)
                 ->post('/v1/posts', $payload),
-            [200, 201, 202],
+            [200, 201, 202, 207],
         );
     }
 

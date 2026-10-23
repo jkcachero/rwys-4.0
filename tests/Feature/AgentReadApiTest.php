@@ -30,13 +30,17 @@ class AgentReadApiTest extends TestCase
         $this->assertDatabaseCount('agent_request_audits', 1);
     }
 
-    public function test_accounts_are_limited_to_active_readable_client_permissions(): void
+    public function test_accounts_are_limited_to_active_client_permissions(): void
     {
         [$token, $client] = $this->agentToken([AgentAbility::AccountsRead->value]);
         $visible = ProviderAccount::factory()->create();
         $hidden = ProviderAccount::factory()->create();
-        ClientAccountPermission::factory()->create(['client_id' => $client, 'provider_account_id' => $visible, 'can_read' => true]);
-        ClientAccountPermission::factory()->create(['client_id' => $client, 'provider_account_id' => $hidden, 'can_read' => false]);
+        ClientAccountPermission::factory()->create(['client_id' => $client, 'provider_account_id' => $visible]);
+        ClientAccountPermission::factory()->create([
+            'client_id' => $client,
+            'provider_account_id' => $hidden,
+            'is_active' => false,
+        ]);
 
         $this->withToken($token)->getJson('/api/v1/zernio/accounts?limit=25')
             ->assertOk()

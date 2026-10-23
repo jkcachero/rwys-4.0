@@ -235,7 +235,7 @@ class ClientProfileAssignmentService
 
             ClientAccountPermission::query()->firstOrCreate(
                 ['client_id' => $client->id, 'provider_account_id' => $account->id],
-                ['is_active' => true, 'can_read' => true, 'can_publish' => false, 'can_schedule' => false],
+                ['is_active' => true, 'can_schedule' => false],
             );
         }
 

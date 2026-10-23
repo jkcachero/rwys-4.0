@@ -115,7 +115,6 @@ class AgentTokenService
 
         $availableIds = $client->accountPermissions()
             ->where('is_active', true)
-            ->where('can_read', true)
             ->whereHas('account', fn ($query) => $query
                 ->where('is_active', true)
                 ->whereIn('public_id', $uniqueIds))
@@ -128,7 +127,7 @@ class AgentTokenService
         sort($availableIds);
 
         if ($uniqueIds !== $availableIds) {
-            throw new DomainException('Every allowed account must be active and readable for this Client.');
+            throw new DomainException('Every allowed account must be active for this Client.');
         }
 
         return $uniqueIds;

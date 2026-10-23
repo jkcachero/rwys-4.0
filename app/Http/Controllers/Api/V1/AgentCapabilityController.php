@@ -21,7 +21,6 @@ class AgentCapabilityController extends Controller
 
         $hasProviderAccess = config('services.zernio.enabled') && $client->accountPermissions()
             ->where('is_active', true)
-            ->where('can_read', true)
             ->whereHas('account', function ($query) use ($token): void {
                 $query->where('is_active', true)
                     ->whereHas('profile', fn ($profile) => $profile

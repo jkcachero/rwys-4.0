@@ -68,8 +68,6 @@ class ClientAuthorityTest extends TestCase
         $this->assertDatabaseHas('client_account_permissions', [
             'client_id' => $client->id,
             'provider_account_id' => $accountId,
-            'can_read' => true,
-            'can_publish' => false,
             'can_schedule' => false,
         ]);
         $this->assertDatabaseMissing('client_account_permissions', [

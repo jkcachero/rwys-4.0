@@ -21,7 +21,6 @@ class ZernioAccountController extends Controller
 
         $accounts = $client->accountPermissions()
             ->where('is_active', true)
-            ->where('can_read', true)
             ->whereHas('account', fn ($query) => $query->where('is_active', true))
             ->when($token->allowed_account_ids !== [], fn ($query) => $query
                 ->whereHas('account', fn ($accountQuery) => $accountQuery

@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\TestWith;
 use Tests\TestCase;
 
 class AgentWriteApiTest extends TestCase
@@ -56,14 +57,13 @@ class AgentWriteApiTest extends TestCase
                 ]),
                 '/api/v1/posts' => Http::response(['post' => [
                     '_id' => $providerPostId,
-                    'accountIds' => [$account->provider_id],
                     'content' => 'Ship the verified update.',
-                    'platforms' => ['instagram'],
                     'status' => 'published',
-                    'platformPosts' => [[
+                    'platforms' => [[
                         'platform' => 'instagram',
+                        'accountId' => $account->provider_id,
                         'status' => 'published',
-                        'url' => 'https://www.instagram.com/p/example',
+                        'platformPostUrl' => 'https://www.instagram.com/p/example',
                     ]],
                 ]], 201),
                 default => Http::response([], 500),
@@ -105,6 +105,9 @@ class AgentWriteApiTest extends TestCase
         Http::assertSentCount(3);
         Http::assertSent(fn (Request $request): bool => $request->method() === 'POST'
             && str_ends_with($request->url(), '/v1/posts')
+            && $request['platforms'] === [['platform' => 'instagram', 'accountId' => $account->provider_id]]
+            && ! array_key_exists('accountIds', $request->data())
+            && ! array_key_exists('profileId', $request->data())
             && $request->hasHeader('Idempotency-Key', hash('sha256', 'publish-key-123')));
     }
 
@@ -163,6 +166,285 @@ class AgentWriteApiTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_immediate_instagram_single_image_is_uploaded_published_and_replayed_without_another_effect(): void
+    {
+        Storage::fake('local');
+        [$token, , $account, $profile] = $this->writeContext('instagram', AgentAbility::PostsPublish);
+        $providerPostId = 'abcdef0123456789abcdef01';
+        $uploadUrl = 'https://cdn.zernio.example/immediate-image.jpg';
+
+        Http::fake(function (Request $request) use ($account, $profile, $providerPostId, $uploadUrl) {
+            $path = parse_url($request->url(), PHP_URL_PATH);
+
+            return match ($path) {
+                '/api/v1/profiles/'.$profile->provider_id => Http::response(['profile' => ['_id' => $profile->provider_id]]),
+                '/api/v1/accounts' => Http::response([
+                    'accounts' => [[
+                        '_id' => $account->provider_id,
+                        'profileId' => $profile->provider_id,
+                        'isActive' => true,
+                        'status' => 'connected',
+                    ]],
+                    'pagination' => ['page' => 1, 'limit' => 100, 'total' => 1, 'pages' => 1],
+                ]),
+                '/api/v1/media/upload-direct' => Http::response(['url' => $uploadUrl], 201),
+                '/api/v1/posts' => Http::response(['post' => [
+                    '_id' => $providerPostId,
+                    'content' => 'Immediate image proof.',
+                    'status' => 'published',
+                    'platforms' => [[
+                        'platform' => 'instagram',
+                        'accountId' => ['_id' => $account->provider_id, 'platform' => 'instagram'],
+                        'status' => 'published',
+                        'platformPostUrl' => 'https://www.instagram.com/p/single-image',
+                    ]],
+                ]], 201),
+                default => Http::response([], 500),
+            };
+        });
+
+        $first = $this->withToken($token)
+            ->withHeader('Idempotency-Key', 'immediate-image-key')
+            ->post("/api/v1/zernio/accounts/{$account->public_id}/posts", [
+                'content' => 'Immediate image proof.',
+                'images' => [$this->jpegUpload('single.jpg')],
+            ], ['Accept' => 'application/json'])
+            ->assertAccepted()
+            ->assertJsonPath('data.status', 'succeeded')
+            ->assertJsonPath('data.outcome.provider_status', 'published')
+            ->assertJsonPath('data.outcome.platform_url', 'https://www.instagram.com/p/single-image');
+
+        $operationId = $first->json('data.id');
+        $operation = AgentOperation::query()->sole();
+        $this->assertSame([hash('sha256', $this->jpegBytes())], $operation->intent['image_hashes']);
+        Storage::disk('local')->assertExists($operation->intent['media_paths'][0]);
+
+        $this->withToken($token)
+            ->withHeader('Idempotency-Key', 'immediate-image-key')
+            ->post("/api/v1/zernio/accounts/{$account->public_id}/posts", [
+                'content' => 'Immediate image proof.',
+                'images' => [$this->jpegUpload('single.jpg')],
+            ], ['Accept' => 'application/json'])
+            ->assertAccepted()
+            ->assertJsonPath('data.id', $operationId);
+
+        Http::assertSentCount(4);
+        Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/v1/posts')
+            && $request['platforms'] === [['platform' => 'instagram', 'accountId' => $account->provider_id]]
+            && $request['publishNow'] === true
+            && $request['isDraft'] === false
+            && $request['mediaItems'] === [['type' => 'image', 'url' => $uploadUrl]]
+            && ! isset($request['scheduledFor'], $request['queueId']));
+    }
+
+    public function test_immediate_instagram_carousel_preserves_image_order_in_uploads_payload_and_idempotency(): void
+    {
+        Storage::fake('local');
+        [$token, , $account, $profile] = $this->writeContext('instagram', AgentAbility::PostsPublish);
+        $firstBytes = $this->jpegBytes();
+        $secondBytes = $this->jpegBytesWithTrailingMetadata();
+        $uploadNumber = 0;
+
+        Http::fake(function (Request $request) use ($account, $profile, &$uploadNumber) {
+            $path = parse_url($request->url(), PHP_URL_PATH);
+
+            return match ($path) {
+                '/api/v1/profiles/'.$profile->provider_id => Http::response(['profile' => ['_id' => $profile->provider_id]]),
+                '/api/v1/accounts' => Http::response([
+                    'accounts' => [[
+                        '_id' => $account->provider_id,
+                        'profileId' => $profile->provider_id,
+                        'isActive' => true,
+                    ]],
+                    'pagination' => ['page' => 1, 'limit' => 100, 'total' => 1, 'pages' => 1],
+                ]),
+                '/api/v1/media/upload-direct' => Http::response(['url' => 'https://cdn.zernio.example/carousel-'.(++$uploadNumber).'.jpg'], 201),
+                '/api/v1/posts' => Http::response(['post' => [
+                    '_id' => '0123456789abcdef01234567',
+                    'status' => 'published',
+                    'platforms' => [['platform' => 'instagram', 'accountId' => $account->provider_id, 'status' => 'published']],
+                ]], 201),
+                default => Http::response([], 500),
+            };
+        });
+
+        $this->withToken($token)
+            ->withHeader('Idempotency-Key', 'carousel-key-123')
+            ->post("/api/v1/zernio/accounts/{$account->public_id}/posts", [
+                'content' => 'Ordered carousel.',
+                'images' => [
+                    UploadedFile::fake()->createWithContent('first.jpg', $firstBytes),
+                    UploadedFile::fake()->createWithContent('second.jpg', $secondBytes),
+                ],
+            ], ['Accept' => 'application/json'])
+            ->assertAccepted()
+            ->assertJsonPath('data.status', 'succeeded');
+
+        $this->assertSame(
+            [hash('sha256', $firstBytes), hash('sha256', $secondBytes)],
+            AgentOperation::query()->sole()->intent['image_hashes'],
+        );
+        Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/v1/posts')
+            && $request['platforms'] === [['platform' => 'instagram', 'accountId' => $account->provider_id]]
+            && $request['mediaItems'] === [
+                ['type' => 'image', 'url' => 'https://cdn.zernio.example/carousel-1.jpg'],
+                ['type' => 'image', 'url' => 'https://cdn.zernio.example/carousel-2.jpg'],
+            ]);
+
+        $this->withToken($token)
+            ->withHeader('Idempotency-Key', 'carousel-key-123')
+            ->post("/api/v1/zernio/accounts/{$account->public_id}/posts", [
+                'content' => 'Ordered carousel.',
+                'images' => [
+                    UploadedFile::fake()->createWithContent('second.jpg', $secondBytes),
+                    UploadedFile::fake()->createWithContent('first.jpg', $firstBytes),
+                ],
+            ], ['Accept' => 'application/json'])
+            ->assertConflict()
+            ->assertJsonPath('error.code', 'idempotency_conflict');
+
+        Http::assertSentCount(5);
+    }
+
+    public function test_immediate_media_rejects_invalid_shapes_platforms_and_caller_controlled_provider_fields(): void
+    {
+        [$token, , $account] = $this->writeContext('linkedin', AgentAbility::PostsPublish);
+        Http::fake();
+
+        $this->withToken($token)
+            ->withHeader('Idempotency-Key', 'invalid-media-key')
+            ->post("/api/v1/zernio/accounts/{$account->public_id}/posts", [
+                'content' => 'Invalid provider input.',
+                'images' => [$this->jpegUpload()],
+                'scheduled_for' => '2026-10-24T12:00:00Z',
+                'mediaItems' => [['url' => 'https://attacker.example/image.jpg']],
+            ], ['Accept' => 'application/json'])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.scheduled_for.0', 'The scheduled_for field is not allowed.')
+            ->assertJsonPath('errors.mediaItems.0', 'The mediaItems field is not allowed.');
+
+        $this->withToken($token)
+            ->withHeader('Idempotency-Key', 'unsupported-platform-key')
+            ->post("/api/v1/zernio/accounts/{$account->public_id}/posts", [
+                'content' => 'LinkedIn image is not allowlisted.',
+                'images' => [$this->jpegUpload()],
+            ], ['Accept' => 'application/json'])
+            ->assertUnprocessable()
+            ->assertJsonPath('error.code', 'unsupported_platform');
+
+        $this->assertDatabaseCount('agent_operations', 0);
+        Http::assertNothingSent();
+    }
+
+    public function test_immediate_instagram_partial_provider_response_records_a_sanitized_failure(): void
+    {
+        Storage::fake('local');
+        [$token, , $account, $profile] = $this->writeContext('instagram', AgentAbility::PostsPublish);
+
+        Http::fake(function (Request $request) use ($account, $profile) {
+            $path = parse_url($request->url(), PHP_URL_PATH);
+
+            return match ($path) {
+                '/api/v1/profiles/'.$profile->provider_id => Http::response(['profile' => ['_id' => $profile->provider_id]]),
+                '/api/v1/accounts' => Http::response([
+                    'accounts' => [[
+                        '_id' => $account->provider_id,
+                        'profileId' => $profile->provider_id,
+                        'isActive' => true,
+                    ]],
+                    'pagination' => ['page' => 1, 'limit' => 100, 'total' => 1, 'pages' => 1],
+                ]),
+                '/api/v1/media/upload-direct' => Http::response(['url' => 'https://cdn.zernio.example/partial.jpg'], 201),
+                '/api/v1/posts' => Http::response(['post' => [
+                    '_id' => 'fedcba9876543210fedcba98',
+                    'status' => 'partial',
+                    'platforms' => [[
+                        'platform' => 'instagram',
+                        'accountId' => $account->provider_id,
+                        'status' => 'failed',
+                        'platformPostUrl' => 'http://unsafe.example/post',
+                        'errorMessage' => 'provider secret details',
+                    ]],
+                ]], 207),
+                default => Http::response([], 500),
+            };
+        });
+
+        $this->withToken($token)
+            ->withHeader('Idempotency-Key', 'partial-image-key')
+            ->post("/api/v1/zernio/accounts/{$account->public_id}/posts", [
+                'content' => 'Partial result proof.',
+                'images' => [$this->jpegUpload()],
+            ], ['Accept' => 'application/json'])
+            ->assertAccepted()
+            ->assertJsonPath('data.status', 'failed')
+            ->assertJsonPath('data.outcome.provider_status', 'failed')
+            ->assertJsonMissingPath('data.outcome.platform_url')
+            ->assertJsonMissing(['provider secret details']);
+    }
+
+    #[TestWith(['publishing', 'processing', 'provider-pending'])]
+    #[TestWith(['publishing', 'uploading', 'provider-pending'])]
+    #[TestWith(['published', null, 'unknown'])]
+    #[TestWith([null, null, 'unknown'])]
+    #[TestWith(['cancelled', 'cancelled', 'failed'])]
+    public function test_publication_requires_explicit_target_status(?string $postStatus, ?string $targetStatus, string $expectedStatus): void
+    {
+        [$token, , $account, $profile] = $this->writeContext('instagram', AgentAbility::PostsPublish);
+        Http::fake([
+            'zernio.example/api/v1/profiles/*' => Http::response(['profile' => ['_id' => $profile->provider_id]]),
+            'zernio.example/api/v1/accounts*' => Http::response(['accounts' => [[
+                '_id' => $account->provider_id,
+                'profileId' => $profile->provider_id,
+                'isActive' => true,
+            ]], 'pagination' => ['page' => 1, 'limit' => 100, 'total' => 1, 'pages' => 1]]),
+            'zernio.example/api/v1/posts' => Http::response(['post' => [
+                '_id' => '0123456789abcdef01234567',
+                'status' => $postStatus,
+                'platforms' => [[
+                    'platform' => 'instagram',
+                    'accountId' => $account->provider_id,
+                    'status' => $targetStatus,
+                ]],
+            ]], 201),
+        ]);
+
+        $this->withToken($token)->withHeader('Idempotency-Key', 'target-status-test')
+            ->postJson("/api/v1/zernio/accounts/{$account->public_id}/posts", ['content' => 'Status test.'])
+            ->assertAccepted()->assertJsonPath('data.status', $expectedStatus);
+
+        $this->assertSame($expectedStatus, AgentOperation::query()->sole()->status);
+        Http::assertSentCount(3);
+    }
+
+    #[TestWith(['ffffffffffffffffffffffff', 'instagram'])]
+    #[TestWith(['abcdefabcdefabcdefabcdef', 'facebook'])]
+    public function test_mismatched_provider_target_returns_502_without_persisting_a_post(string $targetAccountId, string $targetPlatform): void
+    {
+        [$token, , $account, $profile] = $this->writeContext('instagram', AgentAbility::PostsPublish);
+        Http::fake([
+            'zernio.example/api/v1/profiles/*' => Http::response(['profile' => ['_id' => $profile->provider_id]]),
+            'zernio.example/api/v1/accounts*' => Http::response(['accounts' => [[
+                '_id' => $account->provider_id,
+                'profileId' => $profile->provider_id,
+                'isActive' => true,
+            ]], 'pagination' => ['page' => 1, 'limit' => 100, 'total' => 1, 'pages' => 1]]),
+            'zernio.example/api/v1/posts' => Http::response(['post' => [
+                '_id' => '0123456789abcdef01234567',
+                'status' => 'published',
+                'platforms' => [['platform' => $targetPlatform, 'accountId' => $targetAccountId, 'status' => 'published']],
+            ]], 201),
+        ]);
+
+        $this->withToken($token)->withHeader('Idempotency-Key', 'wrong-target-test')
+            ->postJson("/api/v1/zernio/accounts/{$account->public_id}/posts", ['content' => 'Ownership test.'])
+            ->assertStatus(502)->assertJsonPath('error.code', 'provider_error');
+
+        $this->assertDatabaseCount('provider_posts', 0);
+        $this->assertSame('unknown', AgentOperation::query()->sole()->status);
+        Http::assertSentCount(3);
+    }
+
     public function test_scheduled_instagram_jpeg_is_validated_stored_and_replayed_without_another_effect(): void
     {
         Carbon::setTestNow('2026-10-23 12:00:00 UTC');
@@ -194,9 +476,8 @@ class AgentWriteApiTest extends TestCase
                 ], 201),
                 '/api/v1/posts' => Http::response(['post' => [
                     '_id' => $providerPostId,
-                    'accountIds' => [$account->provider_id],
                     'content' => 'Scheduled proof.',
-                    'platforms' => ['instagram'],
+                    'platforms' => [['platform' => 'instagram', 'accountId' => $account->provider_id, 'status' => 'pending']],
                     'scheduledFor' => $scheduledFor,
                     'status' => 'scheduled',
                     'mediaItems' => [['url' => $uploadUrl]],
@@ -271,8 +552,8 @@ class AgentWriteApiTest extends TestCase
         ]);
         $profile = ProviderProfile::factory()->create([
             'provider_connection_id' => $connection->id,
-            'provider_id' => 'profile-123',
-            'provider_id_hash' => hash('sha256', 'profile-123'),
+            'provider_id' => '1234567890abcdef12345678',
+            'provider_id_hash' => hash('sha256', '1234567890abcdef12345678'),
         ]);
         $client->providerProfiles()->attach($profile, [
             'assigned_by' => $owner->id,
@@ -280,15 +561,13 @@ class AgentWriteApiTest extends TestCase
         ]);
         $account = ProviderAccount::factory()->create([
             'provider_profile_id' => $profile,
-            'provider_id' => 'account-123',
-            'provider_id_hash' => hash('sha256', 'account-123'),
+            'provider_id' => 'abcdefabcdefabcdefabcdef',
+            'provider_id_hash' => hash('sha256', 'abcdefabcdefabcdefabcdef'),
             'platform' => $platform,
         ]);
         ClientAccountPermission::factory()->create([
             'client_id' => $client,
             'provider_account_id' => $account,
-            'can_read' => true,
-            'can_publish' => $ability === AgentAbility::PostsPublish,
             'can_schedule' => $ability === AgentAbility::PostsSchedule,
         ]);
         $token = app(AgentTokenService::class)->issue($owner, $client, 'Write test', null, [$account->public_id]);
@@ -297,13 +576,20 @@ class AgentWriteApiTest extends TestCase
         return [$token->plainTextToken, $client, $account, $profile];
     }
 
-    private function jpegUpload(): UploadedFile
+    private function jpegUpload(string $filename = 'scheduled.jpg'): UploadedFile
     {
-        return UploadedFile::fake()->createWithContent('scheduled.jpg', $this->jpegBytes());
+        return UploadedFile::fake()->createWithContent($filename, $this->jpegBytes());
     }
 
     private function jpegBytes(): string
     {
         return base64_decode('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAEf/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9oADAMBAAIAAwAAABD/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/EH//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/EH//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/EH//2Q==', true);
+    }
+
+    private function jpegBytesWithTrailingMetadata(): string
+    {
+        $bytes = $this->jpegBytes();
+
+        return substr($bytes, 0, -2)."\xFF\xFE\x00\x06test"."\xFF\xD9";
     }
 }

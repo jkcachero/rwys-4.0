@@ -238,7 +238,6 @@ class AgentBrokerReadApiTest extends TestCase
         ClientAccountPermission::factory()->create([
             'client_id' => $client,
             'provider_account_id' => $account,
-            'can_read' => true,
         ]);
         $token = app(AgentTokenService::class)->issue($owner, $client, 'Broker test');
         $token->accessToken->forceFill(['abilities' => $abilities])->save();

@@ -146,8 +146,7 @@ class ZernioBrokerReadService
             ->where('is_active', true)
             ->whereHas('permissions', fn ($query) => $query
                 ->where('client_id', $client->getKey())
-                ->where('is_active', true)
-                ->where('can_read', true))
+                ->where('is_active', true))
             ->whereHas('profile', fn ($query) => $query
                 ->where('provider', 'zernio')
                 ->where('is_active', true)
