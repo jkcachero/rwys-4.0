@@ -21,6 +21,7 @@ class ZernioPostPublishController extends Controller
             $request,
             $account,
             $validated['content'],
+            $request->file('images', []),
             $validated['idempotency_key'],
         );
 

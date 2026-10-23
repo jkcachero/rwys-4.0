@@ -24,10 +24,12 @@ class ZernioBrokerWriteService
         private readonly ZernioAccountLookupService $accounts,
     ) {}
 
+    /** @param list<UploadedFile> $images */
     public function publish(
         Request $request,
         ProviderAccount $account,
         string $content,
+        array $images,
         string $idempotencyKey,
     ): AgentOperation {
         if (! config('services.zernio.publish_enabled')) {
@@ -36,18 +38,37 @@ class ZernioBrokerWriteService
 
         [$client, $token, $account, $profile] = $this->authorizedContext($request, $account, 'can_publish');
 
-        $intent = [
+        if ($images !== [] && $account->platform !== 'instagram') {
+            throw new ZernioRequestException('This account does not support immediate image posts.', 422, 'unsupported_platform');
+        }
+
+        $imageContents = [];
+        $imageHashes = [];
+
+        foreach ($images as $image) {
+            $contents = file_get_contents($image->getRealPath());
+
+            if (! is_string($contents)) {
+                throw new ZernioRequestException('An image could not be read.', 422, 'invalid_image');
+            }
+
+            $imageContents[] = $contents;
+            $imageHashes[] = hash('sha256', $contents);
+        }
+
+        $payload = [
             'account_id' => $account->public_id,
             'content' => $content,
             'platform' => $account->platform,
+            'image_hashes' => $imageHashes,
         ];
-        $operation = $this->existingOperation($client, AgentAbility::PostsPublish, $idempotencyKey, $intent);
+        $operation = $this->existingOperation($client, AgentAbility::PostsPublish, $idempotencyKey, $payload);
 
         if ($operation !== null) {
             return $operation;
         }
 
-        $operation = $this->createOperation($request, $client, $token, $account, AgentAbility::PostsPublish, $idempotencyKey, $intent);
+        $operation = $this->createOperation($request, $client, $token, $account, AgentAbility::PostsPublish, $idempotencyKey, $payload);
 
         if (! $operation->wasRecentlyCreated) {
             return $operation;
@@ -56,26 +77,82 @@ class ZernioBrokerWriteService
         try {
             $this->verifyProfileAndAccount($profile, $account);
             $this->authorizedContext($request, $account, 'can_publish');
+
+            $mediaPaths = [];
+            foreach ($images as $index => $image) {
+                $mediaPath = Storage::disk('local')->putFileAs(
+                    'agent-operations/'.$client->public_id,
+                    $image,
+                    $imageHashes[$index].'.jpg',
+                );
+
+                if (! is_string($mediaPath)) {
+                    throw new ZernioRequestException('An image could not be stored.', 503, 'storage_unavailable');
+                }
+
+                $mediaPaths[] = $mediaPath;
+            }
+
+            $operation->update(['intent' => [...$payload, 'media_paths' => $mediaPaths]]);
             $operation->update(['status' => 'executing', 'started_at' => now()]);
-            $response = $this->zernio->createPost($profile, [
+
+            $mediaItems = [];
+            foreach ($imageContents as $index => $contents) {
+                $upload = $this->zernio->uploadDirect($profile, $contents, $imageHashes[$index].'.jpg');
+                $mediaUrl = Arr::get($upload->data, 'url');
+
+                if (! is_string($mediaUrl) || filter_var($mediaUrl, FILTER_VALIDATE_URL) === false || ! str_starts_with($mediaUrl, 'https://')) {
+                    throw new ZernioRequestException('Zernio returned an invalid media reference.');
+                }
+
+                $mediaItems[] = ['type' => 'image', 'url' => $mediaUrl];
+            }
+
+            $this->authorizedContext($request, $account, 'can_publish');
+            $postPayload = [
                 'profileId' => $profile->provider_id,
                 'accountIds' => [$account->provider_id],
                 'platforms' => [$account->platform],
                 'content' => $content,
                 'isDraft' => false,
                 'publishNow' => true,
-            ], hash('sha256', $idempotencyKey));
+            ];
+
+            if ($mediaItems !== []) {
+                $postPayload['mediaItems'] = $mediaItems;
+            }
+
+            $response = $this->zernio->createPost($profile, $postPayload, hash('sha256', $idempotencyKey));
             $post = $this->postPayload($response->data);
             $this->verifyCreatedPost($post, $account);
             $this->authorizedContext($request, $account, 'can_publish');
             $providerPost = $this->persistPost($client, $account, $post);
+            $providerStatus = (string) ($post['status'] ?? 'published');
+            $platformResults = Arr::get($post, 'platformResults', Arr::get($post, 'platformPosts', []));
+            $platformResult = collect(is_array($platformResults) ? $platformResults : [])
+                ->first(fn (mixed $result): bool => is_array($result) && Arr::get($result, 'platform') === $account->platform);
+            $platformStatus = is_array($platformResult) ? Arr::get($platformResult, 'status') : null;
+            $platformUrl = is_array($platformResult) ? Arr::get($platformResult, 'url') : null;
+            $confirmedStatus = is_string($platformStatus) ? $platformStatus : $providerStatus;
+            $operationStatus = match ($confirmedStatus) {
+                'published' => 'succeeded',
+                'scheduled', 'pending', 'processing' => 'provider-pending',
+                'failed', 'partial' => 'failed',
+                default => 'unknown',
+            };
+            $outcome = [
+                'provider_post_id' => $providerPost->public_id,
+                'provider_status' => $confirmedStatus,
+            ];
+
+            if (is_string($platformUrl) && filter_var($platformUrl, FILTER_VALIDATE_URL) !== false && str_starts_with($platformUrl, 'https://')) {
+                $outcome['platform_url'] = $platformUrl;
+            }
+
             $operation->update([
-                'status' => 'succeeded',
-                'outcome' => [
-                    'provider_post_id' => $providerPost->public_id,
-                    'provider_status' => (string) ($post['status'] ?? 'published'),
-                ],
-                'completed_at' => now(),
+                'status' => $operationStatus,
+                'outcome' => $outcome,
+                'completed_at' => in_array($operationStatus, ['succeeded', 'failed'], true) ? now() : null,
             ]);
         } catch (\Throwable $exception) {
             $operation->update([
