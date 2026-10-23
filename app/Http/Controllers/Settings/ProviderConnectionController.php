@@ -2,10 +2,15 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Exceptions\Zernio\ZernioRequestException;
+use App\Http\Requests\Settings\ConnectZernioRequest;
 use App\Inference\InferenceService;
+use App\Models\ProviderConnection;
 use App\Providers\OpenAiOAuthService;
+use App\Zernio\ZernioHttpClient;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Throwable;
@@ -15,6 +20,7 @@ class ProviderConnectionController
     public function __construct(
         private readonly OpenAiOAuthService $oauth,
         private readonly InferenceService $inference,
+        private readonly ZernioHttpClient $zernio,
     ) {}
 
     public function index(Request $request): Response
@@ -50,6 +56,37 @@ class ProviderConnectionController
         return redirect()->away($authorization['url']);
     }
 
+    public function connectZernio(ConnectZernioRequest $request): RedirectResponse
+    {
+        $connection = new ProviderConnection([
+            'provider' => 'zernio',
+            'access_token' => $request->string('api_token')->toString(),
+            'scopes' => ['profiles:read', 'accounts:read'],
+        ]);
+
+        try {
+            $this->zernio->profiles($connection, 1, 0);
+        } catch (ZernioRequestException) {
+            throw ValidationException::withMessages([
+                'api_token' => 'Zernio could not verify this API token.',
+            ]);
+        }
+
+        $request->user()->providerConnections()->updateOrCreate(
+            ['provider' => 'zernio'],
+            [
+                'client_id' => null,
+                'subject' => null,
+                'access_token' => $request->string('api_token')->toString(),
+                'refresh_token' => null,
+                'access_token_expires_at' => null,
+                'scopes' => ['profiles:read', 'accounts:read'],
+            ],
+        );
+
+        return to_route('connections.edit')->with('status', 'Zernio is connected for profile assignment.');
+    }
+
     public function callback(Request $request): RedirectResponse
     {
         $request->validate([
@@ -70,14 +107,21 @@ class ProviderConnectionController
     {
         $this->authorizeAdmin($request);
 
-        abort_unless($provider === 'openai', 404);
+        abort_unless(in_array($provider, ['openai', 'zernio'], true), 404);
 
         try {
-            $this->inference->prompt(
-                $request->user(),
-                $provider,
-                'Reply with exactly: RWYS connection test passed.',
-            );
+            if ($provider === 'zernio') {
+                $connection = $request->user()->providerConnections()
+                    ->where('provider', 'zernio')
+                    ->firstOrFail();
+                $this->zernio->profiles($connection, 1, 0);
+            } else {
+                $this->inference->prompt(
+                    $request->user(),
+                    $provider,
+                    'Reply with exactly: RWYS connection test passed.',
+                );
+            }
         } catch (Throwable) {
             return to_route('connections.edit')->with('error', 'The provider connection test could not be completed.');
         }
@@ -88,9 +132,13 @@ class ProviderConnectionController
     public function disconnect(Request $request, string $provider): RedirectResponse
     {
         $this->authorizeAdmin($request);
-        abort_unless($provider === 'openai', 404);
+        abort_unless(in_array($provider, ['openai', 'zernio'], true), 404);
 
-        $this->oauth->disconnect($request->user());
+        if ($provider === 'openai') {
+            $this->oauth->disconnect($request->user());
+        } else {
+            $request->user()->providerConnections()->where('provider', 'zernio')->delete();
+        }
 
         return to_route('connections.edit')->with('status', 'Provider disconnected.');
     }

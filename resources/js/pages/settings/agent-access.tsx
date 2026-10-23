@@ -410,16 +410,27 @@ function ProfileAssignment({ client }: { client: SelectedClient }) {
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-                {discovery === null ? (
-                    <Button
-                        type="button"
-                        variant="outline"
-                        disabled={loading}
-                        onClick={() => loadProfiles(1)}
-                    >
-                        {loading ? 'Loading profiles…' : 'Load Zernio profiles'}
+                <div className="flex flex-wrap gap-2">
+                    {discovery === null && (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            disabled={loading}
+                            onClick={() => loadProfiles(1)}
+                        >
+                            {loading
+                                ? 'Loading profiles…'
+                                : 'Load Zernio profiles'}
+                        </Button>
+                    )}
+                    <Button asChild type="button" variant="ghost">
+                        <Link href="/settings/connections">
+                            Manage Zernio connection
+                        </Link>
                     </Button>
-                ) : discovery.profiles.length === 0 ? (
+                </div>
+
+                {discovery === null ? null : discovery.profiles.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                         No Zernio profiles are available on this page.
                     </p>

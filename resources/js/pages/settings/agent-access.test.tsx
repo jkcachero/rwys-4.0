@@ -98,6 +98,8 @@ describe('Agent access settings', () => {
 
         expect(markup).toContain('Assign a Zernio profile');
         expect(markup).toContain('Load Zernio profiles');
+        expect(markup).toContain('Manage Zernio connection');
+        expect(markup).toContain('href="/settings/connections"');
         expect(markup).not.toContain('Issue an agent token');
     });
 });

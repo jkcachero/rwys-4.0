@@ -1,7 +1,7 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, type RouteFormDefinition, applyUrlDefaults } from './../../../../../wayfinder'
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::index
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:20
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:26
 * @route '/settings/connections'
 */
 export const index = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -16,7 +16,7 @@ index.definition = {
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::index
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:20
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:26
 * @route '/settings/connections'
 */
 index.url = (options?: RouteQueryOptions) => {
@@ -25,7 +25,7 @@ index.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::index
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:20
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:26
 * @route '/settings/connections'
 */
 index.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -35,7 +35,7 @@ index.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::index
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:20
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:26
 * @route '/settings/connections'
 */
 index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -45,7 +45,7 @@ index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::index
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:20
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:26
 * @route '/settings/connections'
 */
 const indexForm = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -55,7 +55,7 @@ const indexForm = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => (
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::index
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:20
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:26
 * @route '/settings/connections'
 */
 indexForm.get = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -65,7 +65,7 @@ indexForm.get = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::index
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:20
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:26
 * @route '/settings/connections'
 */
 indexForm.head = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -82,7 +82,7 @@ index.form = indexForm
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::connectOpenAi
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:44
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:50
 * @route '/settings/connections/openai'
 */
 export const connectOpenAi = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -97,7 +97,7 @@ connectOpenAi.definition = {
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::connectOpenAi
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:44
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:50
 * @route '/settings/connections/openai'
 */
 connectOpenAi.url = (options?: RouteQueryOptions) => {
@@ -106,7 +106,7 @@ connectOpenAi.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::connectOpenAi
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:44
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:50
 * @route '/settings/connections/openai'
 */
 connectOpenAi.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -116,7 +116,7 @@ connectOpenAi.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::connectOpenAi
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:44
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:50
 * @route '/settings/connections/openai'
 */
 connectOpenAi.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -126,7 +126,7 @@ connectOpenAi.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => (
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::connectOpenAi
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:44
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:50
 * @route '/settings/connections/openai'
 */
 const connectOpenAiForm = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -136,7 +136,7 @@ const connectOpenAiForm = (options?: RouteQueryOptions): RouteFormDefinition<'ge
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::connectOpenAi
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:44
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:50
 * @route '/settings/connections/openai'
 */
 connectOpenAiForm.get = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -146,7 +146,7 @@ connectOpenAiForm.get = (options?: RouteQueryOptions): RouteFormDefinition<'get'
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::connectOpenAi
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:44
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:50
 * @route '/settings/connections/openai'
 */
 connectOpenAiForm.head = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -162,8 +162,74 @@ connectOpenAiForm.head = (options?: RouteQueryOptions): RouteFormDefinition<'get
 connectOpenAi.form = connectOpenAiForm
 
 /**
+* @see \App\Http\Controllers\Settings\ProviderConnectionController::connectZernio
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:59
+* @route '/settings/connections/zernio'
+*/
+export const connectZernio = (options?: RouteQueryOptions): RouteDefinition<'put'> => ({
+    url: connectZernio.url(options),
+    method: 'put',
+})
+
+connectZernio.definition = {
+    methods: ["put"],
+    url: '/settings/connections/zernio',
+} satisfies RouteDefinition<["put"]>
+
+/**
+* @see \App\Http\Controllers\Settings\ProviderConnectionController::connectZernio
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:59
+* @route '/settings/connections/zernio'
+*/
+connectZernio.url = (options?: RouteQueryOptions) => {
+    return connectZernio.definition.url + queryParams(options)
+}
+
+/**
+* @see \App\Http\Controllers\Settings\ProviderConnectionController::connectZernio
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:59
+* @route '/settings/connections/zernio'
+*/
+connectZernio.put = (options?: RouteQueryOptions): RouteDefinition<'put'> => ({
+    url: connectZernio.url(options),
+    method: 'put',
+})
+
+/**
+* @see \App\Http\Controllers\Settings\ProviderConnectionController::connectZernio
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:59
+* @route '/settings/connections/zernio'
+*/
+const connectZernioForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
+    action: connectZernio.url({
+        [options?.mergeQuery ? 'mergeQuery' : 'query']: {
+            _method: 'PUT',
+            ...(options?.query ?? options?.mergeQuery ?? {}),
+        }
+    }),
+    method: 'post',
+})
+
+/**
+* @see \App\Http\Controllers\Settings\ProviderConnectionController::connectZernio
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:59
+* @route '/settings/connections/zernio'
+*/
+connectZernioForm.put = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
+    action: connectZernio.url({
+        [options?.mergeQuery ? 'mergeQuery' : 'query']: {
+            _method: 'PUT',
+            ...(options?.query ?? options?.mergeQuery ?? {}),
+        }
+    }),
+    method: 'post',
+})
+
+connectZernio.form = connectZernioForm
+
+/**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::test
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:69
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:106
 * @route '/settings/connections/{provider}/test'
 */
 export const test = (args: { provider: string | number } | [provider: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -178,7 +244,7 @@ test.definition = {
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::test
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:69
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:106
 * @route '/settings/connections/{provider}/test'
 */
 test.url = (args: { provider: string | number } | [provider: string | number ] | string | number, options?: RouteQueryOptions) => {
@@ -205,7 +271,7 @@ test.url = (args: { provider: string | number } | [provider: string | number ] |
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::test
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:69
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:106
 * @route '/settings/connections/{provider}/test'
 */
 test.post = (args: { provider: string | number } | [provider: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -215,7 +281,7 @@ test.post = (args: { provider: string | number } | [provider: string | number ] 
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::test
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:69
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:106
 * @route '/settings/connections/{provider}/test'
 */
 const testForm = (args: { provider: string | number } | [provider: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -225,7 +291,7 @@ const testForm = (args: { provider: string | number } | [provider: string | numb
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::test
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:69
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:106
 * @route '/settings/connections/{provider}/test'
 */
 testForm.post = (args: { provider: string | number } | [provider: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -237,7 +303,7 @@ test.form = testForm
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::disconnect
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:88
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:132
 * @route '/settings/connections/{provider}'
 */
 export const disconnect = (args: { provider: string | number } | [provider: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'delete'> => ({
@@ -252,7 +318,7 @@ disconnect.definition = {
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::disconnect
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:88
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:132
 * @route '/settings/connections/{provider}'
 */
 disconnect.url = (args: { provider: string | number } | [provider: string | number ] | string | number, options?: RouteQueryOptions) => {
@@ -279,7 +345,7 @@ disconnect.url = (args: { provider: string | number } | [provider: string | numb
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::disconnect
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:88
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:132
 * @route '/settings/connections/{provider}'
 */
 disconnect.delete = (args: { provider: string | number } | [provider: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'delete'> => ({
@@ -289,7 +355,7 @@ disconnect.delete = (args: { provider: string | number } | [provider: string | n
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::disconnect
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:88
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:132
 * @route '/settings/connections/{provider}'
 */
 const disconnectForm = (args: { provider: string | number } | [provider: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -304,7 +370,7 @@ const disconnectForm = (args: { provider: string | number } | [provider: string 
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::disconnect
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:88
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:132
 * @route '/settings/connections/{provider}'
 */
 disconnectForm.delete = (args: { provider: string | number } | [provider: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -321,7 +387,7 @@ disconnect.form = disconnectForm
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::callback
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:53
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:90
 * @route '/auth/callback'
 */
 export const callback = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -336,7 +402,7 @@ callback.definition = {
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::callback
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:53
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:90
 * @route '/auth/callback'
 */
 callback.url = (options?: RouteQueryOptions) => {
@@ -345,7 +411,7 @@ callback.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::callback
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:53
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:90
 * @route '/auth/callback'
 */
 callback.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -355,7 +421,7 @@ callback.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::callback
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:53
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:90
 * @route '/auth/callback'
 */
 callback.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -365,7 +431,7 @@ callback.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::callback
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:53
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:90
 * @route '/auth/callback'
 */
 const callbackForm = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -375,7 +441,7 @@ const callbackForm = (options?: RouteQueryOptions): RouteFormDefinition<'get'> =
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::callback
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:53
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:90
 * @route '/auth/callback'
 */
 callbackForm.get = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -385,7 +451,7 @@ callbackForm.get = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => 
 
 /**
 * @see \App\Http\Controllers\Settings\ProviderConnectionController::callback
-* @see app/Http/Controllers/Settings/ProviderConnectionController.php:53
+* @see app/Http/Controllers/Settings/ProviderConnectionController.php:90
 * @route '/auth/callback'
 */
 callbackForm.head = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -400,6 +466,6 @@ callbackForm.head = (options?: RouteQueryOptions): RouteFormDefinition<'get'> =>
 
 callback.form = callbackForm
 
-const ProviderConnectionController = { index, connectOpenAi, test, disconnect, callback }
+const ProviderConnectionController = { index, connectOpenAi, connectZernio, test, disconnect, callback }
 
 export default ProviderConnectionController

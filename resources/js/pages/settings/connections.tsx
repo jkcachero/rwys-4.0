@@ -1,5 +1,7 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import type { FormEvent } from 'react';
 import Heading from '@/components/heading';
+import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -9,11 +11,13 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 type Provider = {
     name: string;
     label: string;
-    model: string;
+    model: string | null;
     authentication: string[];
     capabilities: string[];
     message?: string | null;
@@ -24,6 +28,44 @@ type Provider = {
 type Props = {
     providers: Provider[];
 };
+
+function ZernioConnectionForm() {
+    const { data, setData, put, processing, errors, reset } = useForm({
+        api_token: '',
+    });
+
+    const submit = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        put('/settings/connections/zernio', {
+            preserveScroll: true,
+            onSuccess: () => reset('api_token'),
+        });
+    };
+
+    return (
+        <form className="grid gap-3" onSubmit={submit}>
+            <div className="grid gap-2">
+                <Label htmlFor="zernio-api-token">Zernio API token</Label>
+                <Input
+                    id="zernio-api-token"
+                    type="password"
+                    autoComplete="off"
+                    value={data.api_token}
+                    onChange={(event) =>
+                        setData('api_token', event.target.value)
+                    }
+                    required
+                />
+                <InputError message={errors.api_token} />
+            </div>
+            <div>
+                <Button disabled={processing || data.api_token.length === 0}>
+                    {processing ? 'Verifying…' : 'Connect Zernio'}
+                </Button>
+            </div>
+        </form>
+    );
+}
 
 export default function Connections({ providers }: Props) {
     return (
@@ -44,9 +86,11 @@ export default function Connections({ providers }: Props) {
                                 <div className="flex items-start justify-between gap-4">
                                     <div>
                                         <CardTitle>{provider.label}</CardTitle>
-                                        <CardDescription>
-                                            Model: {provider.model}
-                                        </CardDescription>
+                                        {provider.model && (
+                                            <CardDescription>
+                                                Model: {provider.model}
+                                            </CardDescription>
+                                        )}
                                     </div>
                                     <Badge
                                         variant={
@@ -85,6 +129,10 @@ export default function Connections({ providers }: Props) {
                                                 Connect with OpenAI
                                             </Link>
                                         </Button>
+                                    )}
+                                {provider.name === 'zernio' &&
+                                    !provider.connected && (
+                                        <ZernioConnectionForm />
                                     )}
                                 {provider.connected && (
                                     <div className="flex flex-wrap gap-2">

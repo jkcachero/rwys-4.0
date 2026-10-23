@@ -34,6 +34,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('settings/connections', [ProviderConnectionController::class, 'index'])->name('connections.edit');
     Route::get('settings/connections/openai', [ProviderConnectionController::class, 'connectOpenAi'])->name('connections.openai');
+    Route::put('settings/connections/zernio', [ProviderConnectionController::class, 'connectZernio'])
+        ->middleware(RequirePassword::class)
+        ->name('connections.zernio');
     Route::post('settings/connections/{provider}/test', [ProviderConnectionController::class, 'test'])->name('connections.test');
     Route::delete('settings/connections/{provider}', [ProviderConnectionController::class, 'disconnect'])->name('connections.disconnect');
 
