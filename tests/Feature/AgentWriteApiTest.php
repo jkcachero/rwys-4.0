@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\TestWith;
 use Tests\TestCase;
 
 class AgentWriteApiTest extends TestCase
@@ -56,14 +57,13 @@ class AgentWriteApiTest extends TestCase
                 ]),
                 '/api/v1/posts' => Http::response(['post' => [
                     '_id' => $providerPostId,
-                    'accountIds' => [$account->provider_id],
                     'content' => 'Ship the verified update.',
-                    'platforms' => ['instagram'],
                     'status' => 'published',
-                    'platformPosts' => [[
+                    'platforms' => [[
                         'platform' => 'instagram',
+                        'accountId' => $account->provider_id,
                         'status' => 'published',
-                        'url' => 'https://www.instagram.com/p/example',
+                        'platformPostUrl' => 'https://www.instagram.com/p/example',
                     ]],
                 ]], 201),
                 default => Http::response([], 500),
@@ -105,6 +105,9 @@ class AgentWriteApiTest extends TestCase
         Http::assertSentCount(3);
         Http::assertSent(fn (Request $request): bool => $request->method() === 'POST'
             && str_ends_with($request->url(), '/v1/posts')
+            && $request['platforms'] === [['platform' => 'instagram', 'accountId' => $account->provider_id]]
+            && ! array_key_exists('accountIds', $request->data())
+            && ! array_key_exists('profileId', $request->data())
             && $request->hasHeader('Idempotency-Key', hash('sha256', 'publish-key-123')));
     }
 
@@ -187,14 +190,13 @@ class AgentWriteApiTest extends TestCase
                 '/api/v1/media/upload-direct' => Http::response(['url' => $uploadUrl], 201),
                 '/api/v1/posts' => Http::response(['post' => [
                     '_id' => $providerPostId,
-                    'accountIds' => [$account->provider_id],
                     'content' => 'Immediate image proof.',
-                    'platforms' => ['instagram'],
                     'status' => 'published',
-                    'platformPosts' => [[
+                    'platforms' => [[
                         'platform' => 'instagram',
+                        'accountId' => ['_id' => $account->provider_id, 'platform' => 'instagram'],
                         'status' => 'published',
-                        'url' => 'https://www.instagram.com/p/single-image',
+                        'platformPostUrl' => 'https://www.instagram.com/p/single-image',
                     ]],
                 ]], 201),
                 default => Http::response([], 500),
@@ -228,6 +230,7 @@ class AgentWriteApiTest extends TestCase
 
         Http::assertSentCount(4);
         Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/v1/posts')
+            && $request['platforms'] === [['platform' => 'instagram', 'accountId' => $account->provider_id]]
             && $request['publishNow'] === true
             && $request['isDraft'] === false
             && $request['mediaItems'] === [['type' => 'image', 'url' => $uploadUrl]]
@@ -258,9 +261,8 @@ class AgentWriteApiTest extends TestCase
                 '/api/v1/media/upload-direct' => Http::response(['url' => 'https://cdn.zernio.example/carousel-'.(++$uploadNumber).'.jpg'], 201),
                 '/api/v1/posts' => Http::response(['post' => [
                     '_id' => '0123456789abcdef01234567',
-                    'accountIds' => [$account->provider_id],
                     'status' => 'published',
-                    'platformPosts' => [['platform' => 'instagram', 'status' => 'published']],
+                    'platforms' => [['platform' => 'instagram', 'accountId' => $account->provider_id, 'status' => 'published']],
                 ]], 201),
                 default => Http::response([], 500),
             };
@@ -283,6 +285,7 @@ class AgentWriteApiTest extends TestCase
             AgentOperation::query()->sole()->intent['image_hashes'],
         );
         Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/v1/posts')
+            && $request['platforms'] === [['platform' => 'instagram', 'accountId' => $account->provider_id]]
             && $request['mediaItems'] === [
                 ['type' => 'image', 'url' => 'https://cdn.zernio.example/carousel-1.jpg'],
                 ['type' => 'image', 'url' => 'https://cdn.zernio.example/carousel-2.jpg'],
@@ -354,13 +357,13 @@ class AgentWriteApiTest extends TestCase
                 '/api/v1/media/upload-direct' => Http::response(['url' => 'https://cdn.zernio.example/partial.jpg'], 201),
                 '/api/v1/posts' => Http::response(['post' => [
                     '_id' => 'fedcba9876543210fedcba98',
-                    'accountIds' => [$account->provider_id],
                     'status' => 'partial',
-                    'platformResults' => [[
+                    'platforms' => [[
                         'platform' => 'instagram',
+                        'accountId' => $account->provider_id,
                         'status' => 'failed',
-                        'url' => 'http://unsafe.example/post',
-                        'error' => ['message' => 'provider secret details'],
+                        'platformPostUrl' => 'http://unsafe.example/post',
+                        'errorMessage' => 'provider secret details',
                     ]],
                 ]], 207),
                 default => Http::response([], 500),
@@ -378,6 +381,68 @@ class AgentWriteApiTest extends TestCase
             ->assertJsonPath('data.outcome.provider_status', 'failed')
             ->assertJsonMissingPath('data.outcome.platform_url')
             ->assertJsonMissing(['provider secret details']);
+    }
+
+    #[TestWith(['publishing', 'processing', 'provider-pending'])]
+    #[TestWith(['publishing', 'uploading', 'provider-pending'])]
+    #[TestWith(['published', null, 'unknown'])]
+    #[TestWith([null, null, 'unknown'])]
+    #[TestWith(['cancelled', 'cancelled', 'failed'])]
+    public function test_publication_requires_explicit_target_status(?string $postStatus, ?string $targetStatus, string $expectedStatus): void
+    {
+        [$token, , $account, $profile] = $this->writeContext('instagram', AgentAbility::PostsPublish);
+        Http::fake([
+            'zernio.example/api/v1/profiles/*' => Http::response(['profile' => ['_id' => $profile->provider_id]]),
+            'zernio.example/api/v1/accounts*' => Http::response(['accounts' => [[
+                '_id' => $account->provider_id,
+                'profileId' => $profile->provider_id,
+                'isActive' => true,
+            ]], 'pagination' => ['page' => 1, 'limit' => 100, 'total' => 1, 'pages' => 1]]),
+            'zernio.example/api/v1/posts' => Http::response(['post' => [
+                '_id' => '0123456789abcdef01234567',
+                'status' => $postStatus,
+                'platforms' => [[
+                    'platform' => 'instagram',
+                    'accountId' => $account->provider_id,
+                    'status' => $targetStatus,
+                ]],
+            ]], 201),
+        ]);
+
+        $this->withToken($token)->withHeader('Idempotency-Key', 'target-status-test')
+            ->postJson("/api/v1/zernio/accounts/{$account->public_id}/posts", ['content' => 'Status test.'])
+            ->assertAccepted()->assertJsonPath('data.status', $expectedStatus);
+
+        $this->assertSame($expectedStatus, AgentOperation::query()->sole()->status);
+        Http::assertSentCount(3);
+    }
+
+    #[TestWith(['ffffffffffffffffffffffff', 'instagram'])]
+    #[TestWith(['abcdefabcdefabcdefabcdef', 'facebook'])]
+    public function test_mismatched_provider_target_returns_502_without_persisting_a_post(string $targetAccountId, string $targetPlatform): void
+    {
+        [$token, , $account, $profile] = $this->writeContext('instagram', AgentAbility::PostsPublish);
+        Http::fake([
+            'zernio.example/api/v1/profiles/*' => Http::response(['profile' => ['_id' => $profile->provider_id]]),
+            'zernio.example/api/v1/accounts*' => Http::response(['accounts' => [[
+                '_id' => $account->provider_id,
+                'profileId' => $profile->provider_id,
+                'isActive' => true,
+            ]], 'pagination' => ['page' => 1, 'limit' => 100, 'total' => 1, 'pages' => 1]]),
+            'zernio.example/api/v1/posts' => Http::response(['post' => [
+                '_id' => '0123456789abcdef01234567',
+                'status' => 'published',
+                'platforms' => [['platform' => $targetPlatform, 'accountId' => $targetAccountId, 'status' => 'published']],
+            ]], 201),
+        ]);
+
+        $this->withToken($token)->withHeader('Idempotency-Key', 'wrong-target-test')
+            ->postJson("/api/v1/zernio/accounts/{$account->public_id}/posts", ['content' => 'Ownership test.'])
+            ->assertStatus(502)->assertJsonPath('error.code', 'provider_error');
+
+        $this->assertDatabaseCount('provider_posts', 0);
+        $this->assertSame('unknown', AgentOperation::query()->sole()->status);
+        Http::assertSentCount(3);
     }
 
     public function test_scheduled_instagram_jpeg_is_validated_stored_and_replayed_without_another_effect(): void
@@ -411,9 +476,8 @@ class AgentWriteApiTest extends TestCase
                 ], 201),
                 '/api/v1/posts' => Http::response(['post' => [
                     '_id' => $providerPostId,
-                    'accountIds' => [$account->provider_id],
                     'content' => 'Scheduled proof.',
-                    'platforms' => ['instagram'],
+                    'platforms' => [['platform' => 'instagram', 'accountId' => $account->provider_id, 'status' => 'pending']],
                     'scheduledFor' => $scheduledFor,
                     'status' => 'scheduled',
                     'mediaItems' => [['url' => $uploadUrl]],
@@ -488,8 +552,8 @@ class AgentWriteApiTest extends TestCase
         ]);
         $profile = ProviderProfile::factory()->create([
             'provider_connection_id' => $connection->id,
-            'provider_id' => 'profile-123',
-            'provider_id_hash' => hash('sha256', 'profile-123'),
+            'provider_id' => '1234567890abcdef12345678',
+            'provider_id_hash' => hash('sha256', '1234567890abcdef12345678'),
         ]);
         $client->providerProfiles()->attach($profile, [
             'assigned_by' => $owner->id,
@@ -497,8 +561,8 @@ class AgentWriteApiTest extends TestCase
         ]);
         $account = ProviderAccount::factory()->create([
             'provider_profile_id' => $profile,
-            'provider_id' => 'account-123',
-            'provider_id_hash' => hash('sha256', 'account-123'),
+            'provider_id' => 'abcdefabcdefabcdefabcdef',
+            'provider_id_hash' => hash('sha256', 'abcdefabcdefabcdefabcdef'),
             'platform' => $platform,
         ]);
         ClientAccountPermission::factory()->create([

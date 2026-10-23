@@ -110,9 +110,7 @@ class ZernioBrokerWriteService
 
             $this->authorizedContext($request, $account);
             $postPayload = [
-                'profileId' => $profile->provider_id,
-                'accountIds' => [$account->provider_id],
-                'platforms' => [$account->platform],
+                'platforms' => [['platform' => $account->platform, 'accountId' => $account->provider_id]],
                 'content' => $content,
                 'isDraft' => false,
                 'publishNow' => true,
@@ -124,20 +122,16 @@ class ZernioBrokerWriteService
 
             $response = $this->zernio->createPost($profile, $postPayload, hash('sha256', $idempotencyKey));
             $post = $this->postPayload($response->data);
-            $this->verifyCreatedPost($post, $account);
+            $platformResult = $this->verifyCreatedPost($post, $account);
             $this->authorizedContext($request, $account);
             $providerPost = $this->persistPost($client, $account, $post);
-            $providerStatus = (string) ($post['status'] ?? 'published');
-            $platformResults = Arr::get($post, 'platformResults', Arr::get($post, 'platformPosts', []));
-            $platformResult = collect(is_array($platformResults) ? $platformResults : [])
-                ->first(fn (mixed $result): bool => is_array($result) && Arr::get($result, 'platform') === $account->platform);
-            $platformStatus = is_array($platformResult) ? Arr::get($platformResult, 'status') : null;
-            $platformUrl = is_array($platformResult) ? Arr::get($platformResult, 'url') : null;
-            $confirmedStatus = is_string($platformStatus) ? $platformStatus : $providerStatus;
+            $platformStatus = Arr::get($platformResult, 'status');
+            $platformUrl = Arr::get($platformResult, 'platformPostUrl');
+            $confirmedStatus = is_string($platformStatus) ? $platformStatus : 'unknown';
             $operationStatus = match ($confirmedStatus) {
                 'published' => 'succeeded',
-                'scheduled', 'pending', 'processing' => 'provider-pending',
-                'failed', 'partial' => 'failed',
+                'pending', 'processing', 'uploading' => 'provider-pending',
+                'failed', 'cancelled' => 'failed',
                 default => 'unknown',
             };
             $outcome = [
@@ -248,9 +242,7 @@ class ZernioBrokerWriteService
             }
 
             $response = $this->zernio->createPost($profile, [
-                'profileId' => $profile->provider_id,
-                'accountIds' => [$account->provider_id],
-                'platforms' => ['instagram'],
+                'platforms' => [['platform' => $account->platform, 'accountId' => $account->provider_id]],
                 'content' => $content,
                 'mediaItems' => [['url' => $mediaUrl]],
                 'scheduledFor' => $scheduledFor,
@@ -340,18 +332,37 @@ class ZernioBrokerWriteService
         return $post;
     }
 
-    /** @param array<string, mixed> $post */
-    private function verifyCreatedPost(array $post, ProviderAccount $account): void
+    /**
+     * @param  array<string, mixed>  $post
+     * @return array<string, mixed>
+     */
+    private function verifyCreatedPost(array $post, ProviderAccount $account): array
     {
         $providerPostId = Arr::get($post, '_id');
-        $accountIds = Arr::get($post, 'accountIds', []);
 
         if (! is_string($providerPostId)
-            || preg_match('/^[a-f0-9]{24}$/', $providerPostId) !== 1
-            || ! is_array($accountIds)
-            || ! in_array($account->provider_id, $accountIds, true)) {
+            || preg_match('/^[a-f0-9]{24}$/', $providerPostId) !== 1) {
             throw new ZernioRequestException('Zernio post identity could not be verified.');
         }
+
+        $targets = Arr::get($post, 'platforms');
+
+        if (is_array($targets)) {
+            foreach ($targets as $target) {
+                if (! is_array($target)) {
+                    continue;
+                }
+
+                $accountId = Arr::get($target, 'accountId');
+                $accountId = is_array($accountId) ? Arr::get($accountId, '_id') : $accountId;
+
+                if ($accountId === $account->provider_id && Arr::get($target, 'platform') === $account->platform) {
+                    return $target;
+                }
+            }
+        }
+
+        throw new ZernioRequestException('Zernio post identity could not be verified.');
     }
 
     /** @param array<string, mixed> $post */
