@@ -16,8 +16,6 @@ class ClientAccountPermissionFactory extends Factory
             'client_id' => Client::factory(),
             'provider_account_id' => ProviderAccount::factory(),
             'is_active' => true,
-            'can_read' => true,
-            'can_publish' => false,
             'can_schedule' => false,
         ];
     }

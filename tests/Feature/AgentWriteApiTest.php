@@ -504,8 +504,6 @@ class AgentWriteApiTest extends TestCase
         ClientAccountPermission::factory()->create([
             'client_id' => $client,
             'provider_account_id' => $account,
-            'can_read' => true,
-            'can_publish' => $ability === AgentAbility::PostsPublish,
             'can_schedule' => $ability === AgentAbility::PostsSchedule,
         ]);
         $token = app(AgentTokenService::class)->issue($owner, $client, 'Write test', null, [$account->public_id]);

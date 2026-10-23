@@ -6,7 +6,6 @@ use App\Models\Client;
 use App\Models\ClientAccountPermission;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Validator;
 
 class UpdateAgentPermissionRequest extends FormRequest
 {
@@ -28,20 +27,7 @@ class UpdateAgentPermissionRequest extends FormRequest
     {
         return [
             'is_active' => ['required', 'boolean'],
-            'can_read' => ['required', 'boolean'],
-            'can_publish' => ['required', 'boolean'],
             'can_schedule' => ['required', 'boolean'],
         ];
-    }
-
-    /** @return array<callable(Validator): void> */
-    public function after(): array
-    {
-        return [function (Validator $validator): void {
-            if (! $this->boolean('can_read')
-                && ($this->boolean('can_publish') || $this->boolean('can_schedule'))) {
-                $validator->errors()->add('can_read', 'Publish and schedule permissions require read access.');
-            }
-        }];
     }
 }

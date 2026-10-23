@@ -43,7 +43,6 @@ class AgentAccessManagementTest extends TestCase
         ClientAccountPermission::factory()->create([
             'client_id' => $client->id,
             'provider_account_id' => $account->id,
-            'can_publish' => true,
         ]);
 
         $this->actingAs($user)->get(route('settings.agent-access.edit', ['client' => $client->public_id]))
@@ -83,8 +82,6 @@ class AgentAccessManagementTest extends TestCase
                 'permission' => $permission,
             ]), [
                 'is_active' => true,
-                'can_read' => true,
-                'can_publish' => true,
                 'can_schedule' => false,
             ])->assertForbidden();
 
@@ -95,8 +92,6 @@ class AgentAccessManagementTest extends TestCase
                 'permission' => $permission,
             ]), [
                 'is_active' => true,
-                'can_read' => true,
-                'can_publish' => true,
                 'can_schedule' => false,
             ])->assertRedirect(route('password.confirm'));
 
@@ -107,12 +102,10 @@ class AgentAccessManagementTest extends TestCase
                 'permission' => $permission,
             ]), [
                 'is_active' => true,
-                'can_read' => true,
-                'can_publish' => true,
-                'can_schedule' => false,
+                'can_schedule' => true,
             ])->assertRedirect();
 
-        $this->assertTrue($permission->fresh()->can_publish);
+        $this->assertTrue($permission->fresh()->can_schedule);
     }
 
     public function test_owner_can_issue_rotate_and_revoke_a_finite_client_bound_token(): void
@@ -122,7 +115,6 @@ class AgentAccessManagementTest extends TestCase
         $client->users()->attach($owner, ['role' => 'owner', 'is_active' => true]);
         $permission = ClientAccountPermission::factory()->create([
             'client_id' => $client->id,
-            'can_publish' => true,
         ]);
         $account = $permission->account;
 

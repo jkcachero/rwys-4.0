@@ -36,7 +36,7 @@ class ZernioBrokerWriteService
             throw new ZernioRequestException('Zernio publishing is disabled.', 503, 'publishing_disabled');
         }
 
-        [$client, $token, $account, $profile] = $this->authorizedContext($request, $account, 'can_publish');
+        [$client, $token, $account, $profile] = $this->authorizedContext($request, $account);
 
         if ($images !== [] && $account->platform !== 'instagram') {
             throw new ZernioRequestException('This account does not support immediate image posts.', 422, 'unsupported_platform');
@@ -76,7 +76,7 @@ class ZernioBrokerWriteService
 
         try {
             $this->verifyProfileAndAccount($profile, $account);
-            $this->authorizedContext($request, $account, 'can_publish');
+            $this->authorizedContext($request, $account);
 
             $mediaPaths = [];
             foreach ($images as $index => $image) {
@@ -108,7 +108,7 @@ class ZernioBrokerWriteService
                 $mediaItems[] = ['type' => 'image', 'url' => $mediaUrl];
             }
 
-            $this->authorizedContext($request, $account, 'can_publish');
+            $this->authorizedContext($request, $account);
             $postPayload = [
                 'profileId' => $profile->provider_id,
                 'accountIds' => [$account->provider_id],
@@ -125,7 +125,7 @@ class ZernioBrokerWriteService
             $response = $this->zernio->createPost($profile, $postPayload, hash('sha256', $idempotencyKey));
             $post = $this->postPayload($response->data);
             $this->verifyCreatedPost($post, $account);
-            $this->authorizedContext($request, $account, 'can_publish');
+            $this->authorizedContext($request, $account);
             $providerPost = $this->persistPost($client, $account, $post);
             $providerStatus = (string) ($post['status'] ?? 'published');
             $platformResults = Arr::get($post, 'platformResults', Arr::get($post, 'platformPosts', []));
@@ -283,7 +283,7 @@ class ZernioBrokerWriteService
     }
 
     /** @return array{Client, PersonalAccessToken, ProviderAccount, ProviderProfile} */
-    private function authorizedContext(Request $request, ProviderAccount $account, string $permission): array
+    private function authorizedContext(Request $request, ProviderAccount $account, ?string $permission = null): array
     {
         $client = $request->attributes->get('agent_client');
         $token = $request->attributes->get('agent_token');
@@ -299,8 +299,7 @@ class ZernioBrokerWriteService
             ->whereHas('permissions', fn ($query) => $query
                 ->where('client_id', $client->getKey())
                 ->where('is_active', true)
-                ->where('can_read', true)
-                ->where($permission, true))
+                ->when($permission !== null, fn ($query) => $query->where($permission, true)))
             ->whereHas('profile', fn ($query) => $query
                 ->where('provider', 'zernio')
                 ->where('is_active', true)

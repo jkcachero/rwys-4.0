@@ -134,8 +134,7 @@ class AgentProfileAssignmentTest extends TestCase
         $permissions = ClientAccountPermission::query()->where('client_id', $client->id)->get();
         $this->assertCount(2, $permissions);
         $this->assertTrue($permissions->every->is_active);
-        $this->assertTrue($permissions->every->can_read);
-        $this->assertTrue($permissions->every(fn (ClientAccountPermission $permission): bool => ! $permission->can_publish && ! $permission->can_schedule));
+        $this->assertTrue($permissions->every(fn (ClientAccountPermission $permission): bool => ! $permission->can_schedule));
     }
 
     public function test_assignment_rejects_an_incomplete_or_wrong_profile_snapshot_without_persisting_any_mapping(): void
@@ -253,16 +252,12 @@ class AgentProfileAssignmentTest extends TestCase
             'client_id' => $client->id,
             'provider_account_id' => $kept->id,
             'is_active' => false,
-            'can_read' => false,
-            'can_publish' => false,
             'can_schedule' => false,
         ]);
         $removedPermission = ClientAccountPermission::factory()->create([
             'client_id' => $client->id,
             'provider_account_id' => $removed->id,
             'is_active' => true,
-            'can_read' => true,
-            'can_publish' => true,
         ]);
         config(['services.zernio.enabled' => true]);
         Http::preventStrayRequests();
@@ -292,18 +287,15 @@ class AgentProfileAssignmentTest extends TestCase
 
         $this->assertFalse($kept->fresh()->is_active);
         $this->assertFalse($keptPermission->fresh()->is_active);
-        $this->assertFalse($keptPermission->fresh()->can_read);
         $this->assertFalse($removed->fresh()->is_active);
         $this->assertFalse($removedPermission->fresh()->is_active);
-        $this->assertTrue($removedPermission->fresh()->can_publish);
         $this->assertSame(4, $profile->fresh()->sync_generation);
 
         $newAccount = ProviderAccount::query()->where('provider_id_hash', hash('sha256', 'account-3'))->sole();
         $newPermission = ClientAccountPermission::query()->where('provider_account_id', $newAccount->id)->sole();
         $this->assertTrue($newAccount->is_active);
         $this->assertTrue($newPermission->is_active);
-        $this->assertTrue($newPermission->can_read);
-        $this->assertFalse($newPermission->can_publish);
+        $this->assertFalse($newPermission->can_schedule);
     }
 
     /** @return array{User, Client, User} */

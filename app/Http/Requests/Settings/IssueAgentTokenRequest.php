@@ -48,7 +48,6 @@ class IssueAgentTokenRequest extends FormRequest
 
             $permissions = $client->accountPermissions()
                 ->where('is_active', true)
-                ->where('can_read', true)
                 ->whereHas('account', fn ($query) => $query
                     ->where('is_active', true)
                     ->whereIn('public_id', $accountIds))
@@ -58,7 +57,7 @@ class IssueAgentTokenRequest extends FormRequest
             if ($permissions->count() !== count($accountIds)) {
                 $validator->errors()->add(
                     'allowed_account_ids',
-                    'Every selected account must be active and readable for this Client.',
+                    'Every selected account must be active for this Client.',
                 );
             }
 

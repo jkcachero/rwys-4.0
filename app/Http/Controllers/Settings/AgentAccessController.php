@@ -164,8 +164,7 @@ class AgentAccessController extends Controller
                         'name' => $account->name,
                         'platform' => $account->platform,
                         'available' => $account->is_active
-                            && $permission?->is_active === true
-                            && $permission->can_read,
+                            && $permission?->is_active === true,
                     ];
                 })->values(),
             ])->values(),

@@ -12,7 +12,7 @@ class ClientAccountPermission extends Model
     /** @use HasFactory<ClientAccountPermissionFactory> */
     use HasFactory;
 
-    protected $fillable = ['client_id', 'provider_account_id', 'is_active', 'can_read', 'can_publish', 'can_schedule'];
+    protected $fillable = ['client_id', 'provider_account_id', 'is_active', 'can_schedule'];
 
     /** @return BelongsTo<Client, $this> */
     public function client(): BelongsTo
@@ -28,6 +28,6 @@ class ClientAccountPermission extends Model
 
     protected function casts(): array
     {
-        return ['is_active' => 'boolean', 'can_read' => 'boolean', 'can_publish' => 'boolean', 'can_schedule' => 'boolean'];
+        return ['is_active' => 'boolean', 'can_schedule' => 'boolean'];
     }
 }
