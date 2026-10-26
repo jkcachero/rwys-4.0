@@ -171,6 +171,8 @@ class AgentAccessController extends Controller
             'tokens' => $canManage
                 ? PersonalAccessToken::query()
                     ->where('client_id', $client->id)
+                    ->whereNull('revoked_at')
+                    ->where('expires_at', '>', now())
                     ->latest()
                     ->get()
                     ->map(fn (PersonalAccessToken $token): array => [

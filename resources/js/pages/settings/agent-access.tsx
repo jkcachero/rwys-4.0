@@ -12,6 +12,15 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -107,6 +116,62 @@ function accessLabels(abilities: string[]) {
             ? 'Schedule'
             : null,
     ].filter((label): label is string => label !== null);
+}
+
+function RevokeKeyButton({
+    clientId,
+    token,
+}: {
+    clientId: string;
+    token: AgentToken;
+}) {
+    const [open, setOpen] = useState(false);
+    const { delete: revoke, processing } = useForm({});
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button type="button" size="sm" variant="destructive">
+                    Revoke key
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogTitle>Revoke {token.name}?</DialogTitle>
+                <DialogDescription>
+                    This key will no longer authorize API requests. Any agent
+                    using it will lose access. This cannot be undone. Its record
+                    will remain for audit history.
+                </DialogDescription>
+                <DialogFooter>
+                    <DialogClose asChild>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            disabled={processing}
+                        >
+                            Cancel
+                        </Button>
+                    </DialogClose>
+                    <Button
+                        type="button"
+                        variant="destructive"
+                        disabled={processing}
+                        onClick={() =>
+                            revoke(
+                                `/settings/agent-access/${clientId}/tokens/${token.id}`,
+                                {
+                                    preserveScroll: true,
+                                    onSuccess: () => setOpen(false),
+                                },
+                            )
+                        }
+                    >
+                        {processing ? 'Revoking...' : 'Revoke key'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
 }
 
 function TokenCreationForm({ client }: { client: SelectedClient }) {
@@ -598,17 +663,18 @@ export default function AgentAccess({
 
                         <Card>
                             <CardHeader>
-                                <CardTitle>Secure access</CardTitle>
+                                <CardTitle>Stored API keys</CardTitle>
                                 <CardDescription>
-                                    Access keys are shown once when created or
-                                    replaced.
+                                    Manage the keys that authorize API access.
+                                    Secret values are shown only when created or
+                                    replaced. Revoked and expired keys are
+                                    hidden from this list.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 {selectedClient.tokens.length === 0 ? (
                                     <p className="text-sm text-muted-foreground">
-                                        No secure access has been created for
-                                        this user.
+                                        No active API keys for this user.
                                     </p>
                                 ) : (
                                     selectedClient.tokens.map((token) => (
@@ -620,6 +686,13 @@ export default function AgentAccess({
                                                 <div>
                                                     <p className="font-medium">
                                                         {token.name}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Key #{token.id} ·
+                                                        Created:{' '}
+                                                        {formatDate(
+                                                            token.created_at,
+                                                        )}
                                                     </p>
                                                     <p className="text-xs text-muted-foreground">
                                                         Expires:{' '}
@@ -634,17 +707,8 @@ export default function AgentAccess({
                                                         )}
                                                     </p>
                                                 </div>
-                                                <Badge
-                                                    variant={
-                                                        token.revoked_at ===
-                                                        null
-                                                            ? 'secondary'
-                                                            : 'outline'
-                                                    }
-                                                >
-                                                    {token.revoked_at === null
-                                                        ? 'Active'
-                                                        : 'Disabled'}
+                                                <Badge variant="secondary">
+                                                    Active
                                                 </Badge>
                                             </div>
                                             <div className="flex flex-wrap gap-2">
@@ -682,21 +746,12 @@ export default function AgentAccess({
                                                         >
                                                             Replace access key
                                                         </Button>
-                                                        <Button
-                                                            type="button"
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() =>
-                                                                router.delete(
-                                                                    `/settings/agent-access/${selectedClient.id}/tokens/${token.id}`,
-                                                                    {
-                                                                        preserveScroll: true,
-                                                                    },
-                                                                )
+                                                        <RevokeKeyButton
+                                                            clientId={
+                                                                selectedClient.id
                                                             }
-                                                        >
-                                                            Disable
-                                                        </Button>
+                                                            token={token}
+                                                        />
                                                     </div>
                                                 )}
                                         </div>

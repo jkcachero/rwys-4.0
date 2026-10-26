@@ -14,6 +14,7 @@ vi.mock('@inertiajs/react', () => ({
     },
     useForm: <T extends object>(initialData: T) => ({
         data: initialData,
+        delete: vi.fn(),
         errors: {},
         patch: vi.fn(),
         post: vi.fn(),
@@ -39,6 +40,40 @@ const selectedClient = {
 };
 
 describe('Agent access settings', () => {
+    it.each([
+        { canManage: true, revokedAt: null, canRevoke: true },
+        { canManage: false, revokedAt: null, canRevoke: false },
+    ])(
+        'shows key revocation only for an owner with an unrevoked key: %j',
+        ({ canManage, revokedAt, canRevoke }) => {
+            const client = {
+                ...selectedClient,
+                can_manage: canManage,
+                tokens: [
+                    {
+                        id: 6,
+                        name: 'Old agent key',
+                        abilities: ['zernio.posts.read'],
+                        allowed_account_ids: [],
+                        last_used_at: null,
+                        expires_at: '2026-11-23T20:00:00Z',
+                        revoked_at: revokedAt,
+                        created_at: '2026-10-23T20:00:00Z',
+                    },
+                ],
+            };
+            const markup = renderToStaticMarkup(
+                <AgentAccess clients={[client]} selectedClient={client} />,
+            );
+
+            expect(markup).toContain('Stored API keys');
+            expect(markup).toContain(
+                'Revoked and expired keys are hidden from this list',
+            );
+            expect(markup.includes('Revoke key')).toBe(canRevoke);
+        },
+    );
+
     it('renders a user-focused empty state without an eligible user', () => {
         const markup = renderToStaticMarkup(
             <AgentAccess clients={[]} selectedClient={null} />,
@@ -67,7 +102,7 @@ describe('Agent access settings', () => {
         expect(markup).toContain('Access can read and publish');
         expect(markup).toContain('Store this key now.');
         expect(markup).toContain('secret-token');
-        expect(markup).toContain('No secure access has been created');
+        expect(markup).toContain('No active API keys for this user');
         expect(markup).not.toContain('Zernio');
         expect(markup).not.toContain('Approved origins');
         expect(markup).not.toContain('capabilit');

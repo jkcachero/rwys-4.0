@@ -9,6 +9,7 @@ use App\Models\PersonalAccessToken;
 use App\Models\ProviderAccount;
 use App\Models\ProviderProfile;
 use App\Models\User;
+use App\Services\AgentTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -16,6 +17,43 @@ use Tests\TestCase;
 class AgentAccessManagementTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_key_management_shows_only_current_keys_and_retains_hidden_records(): void
+    {
+        $owner = User::factory()->create(['email_verified_at' => now()]);
+        $client = Client::factory()->create();
+        $otherClient = Client::factory()->create();
+        foreach ([$client, $otherClient] as $ownedClient) {
+            $ownedClient->users()->attach($owner, ['role' => 'owner', 'is_active' => true]);
+        }
+        $tokens = app(AgentTokenService::class);
+        $active = $tokens->issue($owner, $client, 'Current key')->accessToken;
+        $revoked = $tokens->issue($owner, $client, 'Revoked key')->accessToken;
+        $tokens->revoke($owner, $client, $revoked);
+        $expired = $tokens->issue($owner, $client, 'Expired key')->accessToken;
+        $expired->forceFill(['expires_at' => now()->subMinute()])->save();
+        $tokens->issue($owner, $otherClient, 'Other client key');
+
+        $this->actingAs($owner)
+            ->get(route('settings.agent-access.edit', ['client' => $client->public_id]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('selectedClient.tokens', 1)
+                ->where('selectedClient.tokens.0.id', $active->id));
+
+        $this->withSession(['auth.password_confirmed_at' => time()])
+            ->delete(route('settings.agent-access.tokens.destroy', [
+                'client' => $client,
+                'token' => $active,
+            ]))->assertRedirect();
+
+        $this->get(route('settings.agent-access.edit', ['client' => $client->public_id]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->has('selectedClient.tokens', 0));
+
+        $this->assertDatabaseCount('personal_access_tokens', 4);
+        $this->assertNotNull($active->fresh()->revoked_at);
+    }
 
     public function test_active_client_members_can_view_only_their_agent_access_clients(): void
     {
