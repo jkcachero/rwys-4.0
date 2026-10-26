@@ -7,36 +7,19 @@ vi.mock('@inertiajs/react', () => ({
 
 import Dashboard from './dashboard';
 
-describe('Dashboard workspace', () => {
-    it('renders the read-only workspace state', () => {
-        const markup = renderToStaticMarkup(
-            <Dashboard
-                workspace={{
-                    status: 'ready',
-                    greeting: 'Welcome back, Ada.',
-                    correlationId: 'request-123',
-                    conversation: { status: 'empty', messages: [] },
-                    sources: [],
-                    connections: [],
-                    provider: {
-                        status: 'deferred',
-                        message: 'Provider reads are deferred until approved.',
-                    },
-                    capabilities: [
-                        { name: 'AdKit read access', status: 'deferred' },
-                        { name: 'Zernio read access', status: 'deferred' },
-                        { name: 'Personal OpenAI / Claude connections', status: 'available' },
-                    ],
-                }}
-            />,
-        );
+describe('Dashboard', () => {
+    it('renders the starter placeholders without the retired AI workspace', () => {
+        const markup = renderToStaticMarkup(<Dashboard />);
 
-        expect(markup).toContain('Welcome back, Ada.');
-        expect(markup).toContain('No messages yet');
-        expect(markup).toContain('Personal AI connections');
-        expect(markup).toContain('request-123');
-        expect(markup).toContain('Add an OpenAI or Claude API key.');
-        expect(markup).toContain('Save connection');
-        expect(markup).toContain('No personal OpenAI or Claude connection is configured yet.');
+        expect(markup.match(/<svg\b/g)).toHaveLength(4);
+        expect(markup).toContain('md:grid-cols-3');
+        expect(markup).not.toContain('Authenticated AI workspace');
+        expect(markup).not.toContain('Conversation');
+        expect(markup).not.toContain('Capability access');
+        expect(markup).not.toContain('Personal AI connections');
+        expect(markup).not.toContain('Connect ChatGPT');
+        expect(markup).not.toContain('Save connection');
+        expect(markup).not.toContain('Source evidence');
+        expect(markup).not.toContain('<input');
     });
 });

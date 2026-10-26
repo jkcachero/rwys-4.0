@@ -17,18 +17,13 @@ class WorkspaceTest extends TestCase
         $this->get('/dashboard')->assertRedirect('/login');
     }
 
-    public function test_verified_users_receive_a_functional_workspace(): void
+    public function test_verified_users_receive_the_dashboard_without_workspace_data(): void
     {
         $user = User::factory()->create(['email_verified_at' => now()]);
 
         $this->actingAs($user)->get('/dashboard')->assertOk()->assertInertia(fn ($page) => $page
             ->component('dashboard')
-            ->where('workspace.status', 'ready')
-            ->where('workspace.provider.status', 'unavailable')
-            ->where('workspace.capabilities.0.status', 'ready')
-            ->where('workspace.capabilities.2.status', 'available')
-            ->where('workspace.connections', [])
-            ->missing('workspace.user.email'));
+            ->missing('workspace'));
     }
 
     public function test_verified_users_can_submit_a_bounded_read_request(): void

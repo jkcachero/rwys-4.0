@@ -3,11 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Inference\InferenceService;
-use App\Services\AIConnectionService;
 use App\Workspace\Services\WorkspaceReadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use Throwable;
@@ -17,14 +15,11 @@ class WorkspaceController extends Controller
     public function __construct(
         private readonly InferenceService $inference,
         private readonly WorkspaceReadService $reads,
-        private readonly AIConnectionService $connections,
     ) {}
 
-    public function __invoke(Request $request): Response
+    public function __invoke(): Response
     {
-        return Inertia::render('dashboard', [
-            'workspace' => $this->workspace($request),
-        ]);
+        return Inertia::render('dashboard');
     }
 
     public function read(Request $request): JsonResponse
@@ -60,34 +55,5 @@ class WorkspaceController extends Controller
         }
 
         return response()->json($result);
-    }
-
-    /** @return array<string, mixed> */
-    private function workspace(Request $request): array
-    {
-        $providers = $this->inference->status($request->user());
-        $hasAvailableProvider = collect($providers)->contains('status', 'available');
-
-        return [
-            'status' => 'ready',
-            'greeting' => 'Welcome back, '.$request->user()->name.'.',
-            'correlationId' => (string) Str::uuid(),
-            'conversation' => ['status' => 'empty', 'messages' => []],
-            'sources' => [],
-            'provider' => [
-                'status' => $hasAvailableProvider ? 'available' : 'unavailable',
-                'message' => $hasAvailableProvider
-                    ? 'Provider status is available for configured providers.'
-                    : 'Approved read providers are available. Personal AI connections are encrypted and owner-scoped.',
-            ],
-            'connections' => $this->connections->listFor($request->user()),
-            'providers' => $providers,
-            'capabilities' => [
-                ['name' => 'AdKit read access', 'status' => 'ready'],
-                ['name' => 'Zernio read access', 'status' => 'ready'],
-                ['name' => 'Personal OpenAI / Claude connections', 'status' => 'available'],
-                ['name' => 'Provider actions', 'status' => 'approval_required'],
-            ],
-        ];
     }
 }
