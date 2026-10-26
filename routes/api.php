@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\AgentAbility;
+use App\Http\Controllers\Api\V1\AdKitBrokerController;
 use App\Http\Controllers\Api\V1\AgentCapabilityController;
 use App\Http\Controllers\Api\V1\AgentContextController;
 use App\Http\Controllers\Api\V1\AgentOperationController;
@@ -27,6 +28,9 @@ Route::prefix('v1')->middleware(['agent.response', 'auth:sanctum'])->group(funct
     Route::get('/capabilities', AgentCapabilityController::class)
         ->middleware(['agent.ability:'.AgentAbility::ContextRead->value, 'agent.admit', 'agent.audit'])
         ->name('api.v1.capabilities');
+    Route::post('/manage/platform-api-requests', AdKitBrokerController::class)
+        ->middleware(['agent.ability:'.AgentAbility::AdKitRead->value, 'agent.admit:read', 'agent.audit'])
+        ->name('api.v1.adkit.forward');
     Route::get('/zernio/accounts', [ZernioAccountController::class, 'index'])
         ->middleware(['agent.ability:'.AgentAbility::AccountsRead->value, 'agent.admit', 'agent.audit'])
         ->name('api.v1.zernio.accounts.index');

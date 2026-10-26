@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
     title: RWYS Agent API
     version: 1.0.0
-    description: Curated client-scoped Zernio proxy with fixed read and publish capabilities, RWYS tenancy enforcement, and durable writes.
+    description: Curated client-scoped Zernio capabilities and an account-scoped read-only AdKit provider broker. Callers supply only the RWYS Sanctum Bearer API_KEY; provider credentials and project context are internal. AdKit preserves raw provider identifiers and payloads, unlike Zernio local UUID resources. Response middleware adds request_id to success and error JSON envelopes.
 servers:
     - url: /api/v1
 security:
@@ -37,6 +37,53 @@ paths:
                 '403': { $ref: '#/components/responses/Forbidden' }
                 '422': { $ref: '#/components/responses/Unprocessable' }
                 '429': { $ref: '#/components/responses/RateLimited' }
+    /manage/platform-api-requests:
+        post:
+            operationId: forwardAdKitRequest
+            x-agent-ability: adkit.read
+            description: >-
+                Forwards the documented AdKit provider request using only Authorization Bearer API_KEY
+                (the RWYS Sanctum token). Provider credentials and project context are injected internally;
+                no caller-supplied provider key or project header is required. Caller project headers are
+                ignored and never forwarded; provider credential fields in the body are rejected. The upstream host
+                is fixed and not caller-controlled. Only GET reads of an authorized act_target account root,
+                campaigns, adsets, ads or insights are allowed, not generic writes or an arbitrary-path proxy. accountId
+                is the stored act_context, not the endpoint target; when omitted it is injected internally,
+                and when supplied it must match the stored context. Provider IDs and metrics are preserved
+                without local campaign UUID mappings or normalized rows. Source provenance: direct-provider curl
+                against AdKit Meta ads on 2026-10-26 returned populated account stats, including spend 180.28.
+                This verifies the upstream contract, not live RWYS forwarding: the current forwarding route has
+                automated fake-backed coverage; live acceptance requires configured Client mappings, enabled dispatch
+                and an available authorized RWYS key. The example requests
+                ad-level insights for August 26 through October 26. Pagination remains provider-owned.
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/AdKitForwardRequest' }
+                        example:
+                            platform: meta
+                            endpoint: act_1185818863112933/insights
+                            method: GET
+                            description: Read Meta ad stats from August 26 through October 26
+                            payload:
+                                fields: account_id,campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,impressions,reach,clicks,spend,cpc,cpm,ctr,date_start,date_stop
+                                time_range: '{"since":"2026-08-26","until":"2026-10-26"}'
+                                level: ad
+                                limit: 25
+            responses:
+                '200':
+                    description: Provider forwarding envelope with raw provider response and results; middleware adds request_id. Empty results do not imply zero activity.
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/AdKitForwardResponse' }
+                '401': { $ref: '#/components/responses/Unauthorized' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '422': { $ref: '#/components/responses/Unprocessable' }
+                '429': { $ref: '#/components/responses/RateLimited' }
+                '502': { $ref: '#/components/responses/AdKitProviderError' }
+                '503': { $ref: '#/components/responses/AdKitProviderUnavailable' }
     /zernio/accounts:
         get:
             operationId: listZernioAccounts
@@ -286,6 +333,16 @@ components:
             required: true
             schema: { type: string, minLength: 8, maxLength: 200 }
     responses:
+        AdKitProviderError:
+            description: AdKit authentication failure, invalid or oversized response, invalid read request, or provider error (502). Flat error/message envelope with middleware request_id.
+            content:
+                application/json:
+                    schema: { $ref: '#/components/schemas/AdKitErrorResponse' }
+        AdKitProviderUnavailable:
+            description: AdKit disabled, unavailable configuration or credentials, invalid mapping, unreachable provider, or provider rate limit (503). Flat error/message envelope with middleware request_id.
+            content:
+                application/json:
+                    schema: { $ref: '#/components/schemas/AdKitErrorResponse' }
         Unauthorized:
             description: Bearer authentication is missing or invalid.
             content:
@@ -342,7 +399,97 @@ components:
                 - zernio.posts.read
                 - zernio.analytics.read
                 - operations.read
+                - adkit.read
                 - zernio.posts.publish
+        AdKitForwardRequest:
+            type: object
+            additionalProperties: false
+            required: [platform, endpoint, method, description, payload]
+            properties:
+                platform: { type: string, const: meta }
+                accountId:
+                    type: string
+                    maxLength: 100
+                    pattern: '^act_[0-9]+$'
+                    description: Optional act_context injected internally if omitted. If supplied, must match the stored provider account context; this is not an RWYS UUID or the act_target endpoint selector.
+                endpoint:
+                    type: string
+                    maxLength: 100
+                    pattern: '^/?act_[0-9]+(?:/(?:campaigns|insights|adsets|ads))?$'
+                    description: Authorized act_target root, campaigns, adsets, ads or insights only. An optional leading slash is accepted. No URL, host, query string, arbitrary path or campaign-ID path. Target authorization is enforced by RWYS.
+                method: { type: string, const: GET }
+                description: { type: string, minLength: 1, maxLength: 200 }
+                payload: { $ref: '#/components/schemas/AdKitReadPayload' }
+        AdKitReadPayload:
+            type: object
+            additionalProperties: false
+            description: Only whitelisted read parameters are accepted. fields is a comma-separated list of distinct approved scalar provider fields appropriate to the endpoint, not a Graph expansion or arbitrary query. RWYS may add upstream identity fields for authorization and removes only those additions before returning the provider projection. Insights require exactly one of time_range or date_preset; other reads cannot supply time_range, date_preset or level. No credentials, headers, project, host or mutation fields are accepted.
+            required: [fields]
+            properties:
+                fields:
+                    type: string
+                    maxLength: 1000
+                    pattern: '^(?:id|account_id|account_currency|name|account_status|disable_reason|currency|timezone_name|status|effective_status|objective|daily_budget|lifetime_budget|created_time|updated_time|campaign_id|campaign_name|adset_id|adset_name|ad_id|ad_name|impressions|reach|clicks|spend|cpc|cpm|ctr|date_start|date_stop)(?:,(?:id|account_id|account_currency|name|account_status|disable_reason|currency|timezone_name|status|effective_status|objective|daily_budget|lifetime_budget|created_time|updated_time|campaign_id|campaign_name|adset_id|adset_name|ad_id|ad_name|impressions|reach|clicks|spend|cpc|cpm|ctr|date_start|date_stop))*$'
+                limit: { type: integer, minimum: 1, maximum: 100, default: 25 }
+                after:
+                    type: string
+                    minLength: 1
+                    maxLength: 4096
+                    description: Opaque provider continuation cursor, not a URL. Reuse only with the same authorized endpoint and filters.
+                time_range:
+                    type: string
+                    maxLength: 100
+                    contentMediaType: application/json
+                    description: JSON-encoded object with since and until ISO dates, not a nested JSON request object. since <= until <= today, at most 90 days inclusive. Mutually exclusive with date_preset.
+                    contentSchema:
+                        type: object
+                        additionalProperties: false
+                        required: [since, until]
+                        properties:
+                            since: { type: string, format: date }
+                            until: { type: string, format: date }
+                    example: '{"since":"2026-08-26","until":"2026-10-26"}'
+                date_preset:
+                    type: string
+                    enum: [today, yesterday, this_month, last_month, this_quarter, maximum, last_3d, last_7d, last_14d, last_28d, last_30d, last_90d, last_week_mon_sun, last_week_sun_sat, last_quarter, last_year, this_week_mon_today, this_week_sun_today, this_year]
+                    description: Provider date preset, including maximum. Mutually exclusive with time_range.
+                level: { type: string, enum: [account, campaign, adset, ad] }
+            not:
+                required: [time_range, date_preset]
+        AdKitForwardResponse:
+            type: object
+            additionalProperties: false
+            description: Preserves the provider forwarding envelope. response is the raw provider object and results is the raw provider array, including provider IDs, string metrics and provider pagination when present. No fabricated zero metrics, normalized rows or campaign UUID mappings. Nested provider objects remain extensible according to the provider contract.
+            required: [platform, status, response, results, request_id]
+            properties:
+                platform: { type: string, const: meta }
+                status: { type: string, const: executed }
+                response: { type: object, additionalProperties: true }
+                results:
+                    type: array
+                    items: { type: object, additionalProperties: true }
+                request_id: { $ref: '#/components/schemas/RequestId' }
+        AdKitErrorResponse:
+            type: object
+            additionalProperties: false
+            required: [error, message, request_id]
+            properties:
+                error:
+                    type: string
+                    enum:
+                        - adkit_disabled
+                        - adkit_configuration_error
+                        - adkit_connection_invalid
+                        - adkit_mapping_invalid
+                        - adkit_unreachable
+                        - adkit_rate_limited
+                        - adkit_authentication_failed
+                        - adkit_invalid_response
+                        - adkit_response_too_large
+                        - adkit_invalid_request
+                        - adkit_provider_error
+                message: { type: string }
+                request_id: { $ref: '#/components/schemas/RequestId' }
         PublishPostRequest:
             type: object
             additionalProperties: false

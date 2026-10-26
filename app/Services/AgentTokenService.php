@@ -23,31 +23,55 @@ class AgentTokenService
         array $allowedAccountIds = [],
         ?PersonalAccessToken $rotatedFrom = null,
     ): NewAccessToken {
-        if (! $client->is_active || ! $client->hasActiveOwner($owner) || ! $owner->hasVerifiedEmail()) {
-            throw new DomainException('Only a verified active Client owner may issue an agent token.');
-        }
-
-        $expiration = Carbon::instance($expiresAt ?? now()->addDays(30));
-
-        if ($expiration->isPast() || $expiration->greaterThan(now()->addDays(90))) {
-            throw new DomainException('Agent tokens must expire within 90 days.');
-        }
-
-        $validatedAccountIds = $this->validateAllowedAccounts($client, $allowedAccountIds);
-
-        if ($rotatedFrom !== null && ($rotatedFrom->client_id !== $client->id || $rotatedFrom->revoked_at !== null)) {
-            throw new DomainException('Only an active token belonging to this Client may be rotated.');
-        }
-
         return DB::transaction(function () use (
             $owner,
             $client,
             $name,
-            $expiration,
-            $validatedAccountIds,
+            $expiresAt,
+            $allowedAccountIds,
             $rotatedFrom,
         ): NewAccessToken {
-            $token = $owner->createToken($name, AgentAbility::clientTokenDefaults(), $expiration);
+            $owner = User::query()->lockForUpdate()->find($owner->getKey());
+            $client = Client::query()->lockForUpdate()->find($client->getKey());
+
+            if ($owner === null || $client === null || ! $client->is_active || ! $owner->hasVerifiedEmail()
+                || $client->users()->whereKey($owner->id)->wherePivot('is_active', true)
+                    ->wherePivot('role', 'owner')->lockForUpdate()->first() === null) {
+                throw new DomainException('Only a verified active Client owner may issue an agent token.');
+            }
+
+            if ($rotatedFrom !== null) {
+                $rotatedFrom = PersonalAccessToken::query()->lockForUpdate()->find($rotatedFrom->getKey());
+
+                if ($rotatedFrom === null || $rotatedFrom->client_id !== $client->id || $rotatedFrom->revoked_at !== null) {
+                    throw new DomainException('Only an active token belonging to this Client may be rotated.');
+                }
+
+                if ($rotatedFrom->expires_at === null || ! $rotatedFrom->expires_at->isFuture()) {
+                    throw new DomainException('Only unexpired finite-expiry agent tokens may be rotated.');
+                }
+
+                $currentAccountIds = $rotatedFrom->allowed_account_ids;
+
+                if (! is_array($currentAccountIds) || ($currentAccountIds !== []
+                    && ($allowedAccountIds === [] || array_diff($allowedAccountIds, $currentAccountIds) !== []))) {
+                    throw new DomainException('Token rotation cannot add account access.');
+                }
+
+                $expiresAt = $rotatedFrom->expires_at;
+            }
+
+            $expiration = Carbon::instance($expiresAt ?? now()->addDays(30));
+
+            if (! $expiration->isFuture() || $expiration->greaterThan(now()->addDays(90))) {
+                throw new DomainException('Agent tokens must expire within 90 days.');
+            }
+
+            $validatedAccountIds = $this->validateAllowedAccounts($client, $allowedAccountIds);
+            $abilities = $rotatedFrom !== null
+                ? array_values(array_intersect($rotatedFrom->abilities, AgentAbility::implemented()))
+                : AgentAbility::clientTokenDefaults();
+            $token = $owner->createToken($name, $abilities, $expiration);
             $token->accessToken->forceFill([
                 'client_id' => $client->id,
                 'issued_by' => $owner->id,
@@ -71,24 +95,12 @@ class AgentTokenService
         string $name,
         array $allowedAccountIds = [],
     ): NewAccessToken {
-        if ($token->expires_at === null) {
-            throw new DomainException('Only finite-expiry agent tokens may be rotated.');
-        }
-
-        $currentAccountIds = $token->allowed_account_ids ?? [];
-
-        if ($currentAccountIds !== []
-            && ($allowedAccountIds === [] || array_diff($allowedAccountIds, $currentAccountIds) !== [])) {
-            throw new DomainException('Token rotation cannot add account access.');
-        }
-
         return $this->issue(
             $owner,
             $client,
             $name,
-            $token->expires_at,
-            $allowedAccountIds,
-            $token,
+            allowedAccountIds: $allowedAccountIds,
+            rotatedFrom: $token,
         );
     }
 

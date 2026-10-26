@@ -205,8 +205,9 @@ function TokenCreationForm({ client }: { client: SelectedClient }) {
             <CardHeader>
                 <CardTitle>Create secure access</CardTitle>
                 <CardDescription>
-                    Access can read and publish for the connected accounts you
-                    select. Access expires within 90 days.
+                    Access can read and publish where supported for the
+                    connected accounts you select. Access expires within 90
+                    days.
                 </CardDescription>
             </CardHeader>
             <CardContent>

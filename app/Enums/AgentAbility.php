@@ -9,6 +9,7 @@ enum AgentAbility: string
     case PostsRead = 'zernio.posts.read';
     case AnalyticsRead = 'zernio.analytics.read';
     case OperationsRead = 'operations.read';
+    case AdKitRead = 'adkit.read';
     case PostsPublish = 'zernio.posts.publish';
     case PostsSchedule = 'zernio.posts.schedule';
 
@@ -21,6 +22,7 @@ enum AgentAbility: string
             self::PostsRead->value,
             self::AnalyticsRead->value,
             self::OperationsRead->value,
+            self::AdKitRead->value,
         ];
     }
 
