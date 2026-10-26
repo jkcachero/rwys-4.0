@@ -126,7 +126,8 @@ describe('Agent access settings', () => {
         expect(markup).toContain('Assign a profile');
         expect(markup).toContain('Step 2 — Load available profiles');
         expect(markup).toContain('Load profiles');
-        expect(markup).toContain('Connection settings');
+        expect(markup).not.toContain('Connection settings');
+        expect(markup).not.toContain('/settings/connections');
         expect(markup).not.toContain('Create secure access');
         expect(markup).not.toContain('Zernio');
     });

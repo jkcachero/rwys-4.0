@@ -32,7 +32,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::inertia('settings/appearance', 'settings/appearance')->name('appearance.edit');
 
-    Route::get('settings/connections', [ProviderConnectionController::class, 'index'])->name('connections.edit');
     Route::get('settings/connections/openai', [ProviderConnectionController::class, 'connectOpenAi'])->name('connections.openai');
     Route::put('settings/connections/zernio', [ProviderConnectionController::class, 'connectZernio'])
         ->middleware(RequirePassword::class)

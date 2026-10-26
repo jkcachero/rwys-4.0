@@ -27,11 +27,6 @@ const sidebarNavItems: NavItem[] = [
         icon: null,
     },
     {
-        title: 'Connections',
-        href: '/settings/connections',
-        icon: null,
-    },
-    {
         title: 'Agent access',
         href: '/settings/agent-access',
         icon: null,

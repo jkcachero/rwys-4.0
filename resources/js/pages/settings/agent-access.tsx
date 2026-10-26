@@ -1,4 +1,4 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { useState, type FormEvent } from 'react';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
@@ -383,11 +383,6 @@ function ProfileAssignment({ client }: { client: SelectedClient }) {
                             onClick={loadProfiles}
                         >
                             {loading ? 'Loading profiles…' : 'Load profiles'}
-                        </Button>
-                        <Button asChild type="button" variant="ghost">
-                            <Link href="/settings/connections">
-                                Connection settings
-                            </Link>
                         </Button>
                     </div>
                 </div>
