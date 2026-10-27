@@ -24,7 +24,10 @@ class AdmitAgentRequest
             return $this->denied('forbidden', 'Agent authorization context is unavailable.', 403);
         }
 
-        $retryAfter = $this->admission->rateLimit($client, $token, $mode !== 'read' && ! $request->isMethodSafe());
+        $write = $mode === 'provider'
+            ? $request->input('method') !== 'GET'
+            : ($mode !== 'read' && ! $request->isMethodSafe());
+        $retryAfter = $this->admission->rateLimit($client, $token, $write);
 
         if ($retryAfter !== null) {
             return $this->denied('rate_limited', 'The agent request limit was exceeded.', 429, $retryAfter);

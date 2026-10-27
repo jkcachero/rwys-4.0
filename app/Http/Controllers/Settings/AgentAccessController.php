@@ -9,6 +9,7 @@ use App\Http\Requests\Settings\UpdateAgentPermissionRequest;
 use App\Models\Client;
 use App\Models\ClientAccountPermission;
 use App\Models\PersonalAccessToken;
+use App\Models\ProviderAccount;
 use App\Models\User;
 use App\Services\AgentTokenService;
 use Illuminate\Http\RedirectResponse;
@@ -21,33 +22,72 @@ class AgentAccessController extends Controller
 {
     public function edit(Request $request): Response
     {
+        $validated = $request->validate([
+            'client' => ['sometimes', 'uuid'],
+            'clients_page' => ['sometimes', 'integer', 'min:1', 'max:100000'],
+            'assigned_page' => ['sometimes', 'integer', 'min:1', 'max:100000'],
+        ]);
         $user = $request->user();
-        $clients = Client::query()
+        $isAdmin = $user->hasVerifiedEmail() && $user->isAdmin();
+        $clientQuery = Client::query()
             ->where('is_active', true)
-            ->where(function ($query) use ($user): void {
+            ->when($isAdmin, fn ($query) => $query->whereHas('users', fn ($owners) => $owners
+                ->where('client_user.role', 'owner')
+                ->where('client_user.is_active', true)
+                ->whereNotNull('users.email_verified_at')))
+            ->when(! $isAdmin, fn ($query) => $query->where(function ($query) use ($user): void {
                 $query->whereHas('users', fn ($users) => $users
                     ->whereKey($user->id)
                     ->where('client_user.is_active', true))
                     ->orWhereHas('operatorGrants', fn ($grants) => $grants
                         ->where('user_id', $user->id)
                         ->where('is_active', true));
-            })
+            }))
             ->with('users:id,name,email')
-            ->orderBy('name')
-            ->limit(100)
-            ->get();
+            ->withCount([
+                'accountPermissions as social_account_count' => fn ($permissions) => $permissions
+                    ->where('is_active', true)
+                    ->whereHas('account.profile', fn ($profile) => $profile->where('provider', 'zernio')
+                        ->whereHas('clients', fn ($clients) => $clients
+                            ->whereColumn('client_provider_profiles.client_id', 'client_account_permissions.client_id'))),
+                'accountPermissions as ad_account_count' => fn ($permissions) => $permissions
+                    ->where('is_active', true)
+                    ->whereHas('account.profile', fn ($profile) => $profile->where('provider', 'adkit')),
+            ]);
+        $clientPage = (clone $clientQuery)->orderBy('name')->orderBy('id')->simplePaginate(100, ['*'], 'clients_page');
+        $clients = $clientPage->getCollection();
+        $assignedPage = (clone $clientQuery)
+            ->where(fn ($query) => $query
+                ->whereHas('providerProfiles', fn ($profiles) => $profiles->where('provider', 'zernio')->where('is_active', true))
+                ->orWhereHas('accountPermissions', fn ($permissions) => $permissions->where('is_active', true)
+                    ->whereHas('account.profile', fn ($profile) => $profile->where('provider', 'adkit'))))
+            ->orderBy('name')->orderBy('id')->simplePaginate(25, ['*'], 'assigned_page');
 
-        $selectedClient = $clients->firstWhere('public_id', $request->string('client')->toString())
-            ?? $clients->first();
+        $selectedClient = isset($validated['client'])
+            ? (clone $clientQuery)->where('public_id', $validated['client'])->firstOrFail()
+            : ($assignedPage->getCollection()->first() ?? $clients->first());
+        if ($selectedClient !== null && ! $clients->contains('id', $selectedClient->id)) {
+            $clients->push($selectedClient);
+        }
 
         $props = [
             'clients' => $clients->map(fn (Client $client): array => $this->clientSummary($client))->values(),
+            'can_assign_accounts' => $isAdmin,
+            'assigned_users' => $assignedPage->getCollection()->map(fn (Client $client): array => $this->clientSummary($client))->values(),
+            'assigned_users_pagination' => $assignedPage->hasMorePages() || $assignedPage->currentPage() > 1
+                ? ['page' => $assignedPage->currentPage(), 'has_more' => $assignedPage->hasMorePages()]
+                : null,
+            'client_pagination' => $clientPage->hasMorePages() || $clientPage->currentPage() > 1
+                ? ['page' => $clientPage->currentPage(), 'has_more' => $clientPage->hasMorePages()]
+                : null,
             'selectedClient' => $selectedClient === null
                 ? null
                 : $this->clientDetails($selectedClient, $request),
         ];
 
-        if ($request->session()->has('agent_token_plaintext')) {
+        if ($selectedClient !== null && $selectedClient->hasActiveOwner($user)
+            && $request->session()->get('agent_token_client_id') === $selectedClient->public_id
+            && $request->session()->has('agent_token_plaintext')) {
             $props['token_plaintext'] = $request->session()->get('agent_token_plaintext');
             $props['token_notice'] = $request->session()->get('agent_token_notice');
         }
@@ -81,6 +121,7 @@ class AgentAccessController extends Controller
 
         return $this->redirectToClient($client)
             ->with('agent_token_plaintext', $token->plainTextToken)
+            ->with('agent_token_client_id', $client->public_id)
             ->with('agent_token_notice', 'Copy this token now. It will not be shown again.');
     }
 
@@ -103,6 +144,7 @@ class AgentAccessController extends Controller
 
         return $this->redirectToClient($client)
             ->with('agent_token_plaintext', $newToken->plainTextToken)
+            ->with('agent_token_client_id', $client->public_id)
             ->with('agent_token_notice', 'The previous token was revoked. Copy the replacement now.');
     }
 
@@ -130,19 +172,19 @@ class AgentAccessController extends Controller
     {
         $user = $request->user();
         $canManage = $client->hasActiveOwner($user);
-        $canAssignProfiles = $user->hasVerifiedEmail()
-            && $user->isAdmin()
-            && $client->users()->wherePivot('role', 'owner')->wherePivot('is_active', true)->exists()
-            && $client->operatorGrants()
-                ->where('user_id', $user->id)
-                ->where('is_active', true)
-                ->exists();
+        $canAssignAccounts = $user->isAdmin();
         $permissions = $client->accountPermissions()
-            ->with('account.profile')
+            ->with('account.profile.providerConnection')
             ->orderBy('id')
             ->get();
         $permissionByAccount = $permissions->keyBy('provider_account_id');
+        $adKitPermissions = $permissions->filter(fn ($permission): bool => $permission->is_active
+            && $permission->account?->profile?->provider === 'adkit');
+        $availableAdKitAccountIds = $adKitPermissions->isNotEmpty()
+            ? ProviderAccount::query()->assignedAdKitTo($client)->pluck('id')->all()
+            : [];
         $profiles = $client->providerProfiles()
+            ->where('provider_profiles.provider', 'zernio')
             ->where('provider_profiles.is_active', true)
             ->with(['accounts' => fn ($query) => $query->orderBy('name')])
             ->orderBy('provider_profiles.name')
@@ -151,7 +193,16 @@ class AgentAccessController extends Controller
         return [
             ...$this->clientSummary($client),
             'can_manage' => $canManage,
-            'can_assign_profiles' => $canAssignProfiles,
+            'can_assign_profiles' => $canAssignAccounts,
+            'can_assign_adkit_accounts' => $canAssignAccounts,
+            'adkit_accounts' => $adKitPermissions
+                ->map(fn ($permission): array => [
+                    'id' => $permission->account->public_id,
+                    'name' => $permission->account->name,
+                    'platform' => $permission->account->platform,
+                    'available' => in_array($permission->account->id, $availableAdKitAccountIds, true)
+                        && $permission->account->hasUsableAdKitConnection(),
+                ])->values(),
             'profiles' => $profiles->map(fn ($profile): array => [
                 'id' => $profile->public_id,
                 'name' => $profile->name,
@@ -200,6 +251,8 @@ class AgentAccessController extends Controller
         return [
             'id' => $client->public_id,
             'name' => $client->name,
+            'social_account_count' => (int) $client->social_account_count,
+            'ad_account_count' => (int) $client->ad_account_count,
             'owner' => $owner === null ? null : [
                 'name' => $owner->name,
                 'email' => $owner->email,

@@ -14,7 +14,10 @@ use Illuminate\Validation\ValidationException;
 
 class AdKitBrokerService
 {
-    public function __construct(private readonly AdKitHttpClient $adkit) {}
+    public function __construct(
+        private readonly AdKitHttpClient $adkit,
+        private readonly AdKitBrokerWriteService $writes,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $body
@@ -22,15 +25,32 @@ class AdKitBrokerService
      */
     public function forward(Request $request, array $body): array
     {
-        $target = explode('/', ltrim($body['endpoint'], '/'))[0];
+        $resource = explode('/', ltrim($body['endpoint'], '/'))[0];
+        $numeric = preg_match('/\A[0-9]+\z/', $resource) === 1;
+        $target = $numeric ? ($body['accountId'] ?? '') : $resource;
         [$account, $snapshot] = $this->context($request, $target);
         $connection = $account->profile->providerConnection;
-        if (array_key_exists('accountId', $body) && $body['accountId'] !== $connection->subject) {
+        if (array_key_exists('accountId', $body) && ! in_array($body['accountId'], [$target, $connection->subject], true)) {
             throw ValidationException::withMessages(['accountId' => 'The accountId must match the configured connection context.']);
+        }
+        $body['accountId'] = $connection->subject;
+        $authorize = function () use ($request, $target, $snapshot): ProviderAccount {
+            return $this->context($request, $target, $snapshot)[0];
+        };
+        $secrets = $this->secrets($request, $account);
+        if ($body['method'] !== 'GET') {
+            return $this->writes->forward($request, $account, $body, $request->boolean('publish'), $authorize,
+                fn (array $envelope): array => $this->sanitize($envelope, $secrets));
         }
         $body['payload']['limit'] ??= 25;
         $fields = explode(',', $body['payload']['fields']);
-        $required = str_ends_with($body['endpoint'], '/insights') ? ['account_id'] : ['id', 'account_id'];
+        $images = str_ends_with($body['endpoint'], '/adimages');
+        $required = $images ? ['hash'] : (str_ends_with($body['endpoint'], '/insights') ? ['account_id'] : ['id', 'account_id']);
+        if ($numeric && str_ends_with($body['endpoint'], '/adsets')) {
+            $required[] = 'campaign_id';
+        } elseif ($numeric && str_ends_with($body['endpoint'], '/ads')) {
+            array_push($required, 'campaign_id', 'adset_id');
+        }
         $injectedFields = array_values(array_diff($required, $fields));
         if ($injectedFields !== []) {
             $body['payload']['fields'] = implode(',', [...$fields, ...$injectedFields]);
@@ -41,6 +61,19 @@ class AdKitBrokerService
         $this->context($request, $target, $snapshot);
         if (! in_array($target, array_column($members, 'id'), true)) {
             throw new AdKitRequestException('adkit_invalid_response');
+        }
+
+        if ($numeric) {
+            $account = $authorize();
+            $metadata = $this->adkit->forward($account->profile, [
+                'platform' => 'meta', 'accountId' => $connection->subject, 'endpoint' => '/'.$resource,
+                'method' => 'GET', 'description' => 'Verify resource ownership', 'payload' => ['fields' => 'id,account_id'],
+            ]);
+            $authorize();
+            $identity = $metadata['response'] ?? [];
+            abort_unless(($identity['id'] ?? null) === $resource
+                && in_array($identity['account_id'] ?? null, [$target, substr($target, 4)], true), 404);
+            $this->verifyIdentities($metadata, $target);
         }
 
         [$account] = $this->context($request, $target, $snapshot);
@@ -58,6 +91,13 @@ class AdKitBrokerService
         $this->verifyResponse($envelope, $target, $body);
         $envelope = $this->restoreProjection($envelope, $injectedFields, $target, $body);
 
+        return $this->sanitize($envelope, $secrets);
+    }
+
+    /** @return list<string> */
+    private function secrets(Request $request, ProviderAccount $account): array
+    {
+        $connection = $account->profile->providerConnection;
         try {
             $credentials = [$connection->access_token, $connection->refresh_token, $connection->client_id, $request->bearerToken()];
         } catch (DecryptException) {
@@ -73,7 +113,7 @@ class AdKitBrokerService
             }
         }
 
-        return $this->sanitize($envelope, $secrets);
+        return $secrets;
     }
 
     /**
@@ -90,15 +130,13 @@ class AdKitBrokerService
         $owner = $token?->tokenable;
         abort_unless($token !== null && $client?->is_active && $token->client_id === $client->id
             && $token->revoked_at === null && ($token->expires_at === null || $token->expires_at->isFuture())
-            && $token->can('adkit.read') && $owner instanceof User && $owner->id === $request->user()?->id
+            && $owner instanceof User && $owner->id === $request->user()?->id
             && $token->issued_by === $owner->id && $owner->hasVerifiedEmail() && $client->hasActiveOwner($owner)
             && is_array($token->allowed_account_ids), 403);
 
         $accounts = ProviderAccount::query()->with('profile.providerConnection')
-            ->where('provider_id_hash', hash('sha256', $target))->where('platform', 'meta')->where('is_active', true)
-            ->whereHas('permissions', fn ($query) => $query->where('client_id', $client->id)->where('is_active', true))
-            ->whereHas('profile', fn ($query) => $query->where('provider', 'adkit')->where('is_active', true)
-                ->whereHas('clients', fn ($clients) => $clients->whereKey($client->id)))
+            ->assignedAdKitTo($client)
+            ->where('provider_id_hash', hash('sha256', $target))
             ->when($token->allowed_account_ids !== [], fn ($query) => $query->whereIn('public_id', $token->allowed_account_ids))
             ->limit(2)->get();
         abort_if($accounts->isEmpty(), 404);
@@ -106,9 +144,6 @@ class AdKitBrokerService
             throw new AdKitRequestException('adkit_mapping_invalid');
         }
         $account = $accounts->first();
-        if (config('services.adkit.enabled', false) !== true) {
-            throw new AdKitRequestException('adkit_disabled');
-        }
         try {
             $profile = $account->profile;
             $connection = $profile->providerConnection;
@@ -153,14 +188,34 @@ class AdKitBrokerService
             }
         } else {
             $rows = [$response];
-            $this->verifyAccountId($response['id'] ?? null, $target);
+            $resource = ltrim($body['endpoint'], '/');
+            if (str_starts_with($resource, 'act_')) {
+                $this->verifyAccountId($response['id'] ?? null, $target);
+            } elseif (($response['id'] ?? null) !== $resource) {
+                throw new AdKitRequestException('adkit_invalid_response');
+            }
         }
         foreach ($rows as $row) {
             if (! is_array($row) || array_is_list($row)) {
                 throw new AdKitRequestException('adkit_invalid_response');
             }
-            $this->verifyAccountId($row['account_id'] ?? null, $target);
-            if ($edge && ! str_ends_with($body['endpoint'], '/insights')
+            $parent = explode('/', ltrim($body['endpoint'], '/'))[0];
+            if (preg_match('/\A[0-9]+\z/', $parent) === 1
+                && ((str_ends_with($body['endpoint'], '/adsets') && ($row['campaign_id'] ?? null) !== $parent)
+                    || (str_ends_with($body['endpoint'], '/ads') && ($row['campaign_id'] ?? null) !== $parent && ($row['adset_id'] ?? null) !== $parent))) {
+                throw new AdKitRequestException('adkit_invalid_response');
+            }
+            $images = str_ends_with($body['endpoint'], '/adimages');
+            if ($images) {
+                $hashes = isset($body['payload']['hashes']) ? json_decode($body['payload']['hashes'], true) : null;
+                if (! is_string($row['hash'] ?? null) || $row['hash'] === ''
+                    || ($hashes !== null && (! is_array($hashes) || ! in_array($row['hash'], $hashes, true)))) {
+                    throw new AdKitRequestException('adkit_invalid_response');
+                }
+            } else {
+                $this->verifyAccountId($row['account_id'] ?? null, $target);
+            }
+            if ($edge && ! $images && ! str_ends_with($body['endpoint'], '/insights')
                 && (! is_string($row['id'] ?? null) || preg_match('/\A[0-9]+\z/', $row['id']) !== 1)) {
                 throw new AdKitRequestException('adkit_invalid_response');
             }

@@ -27,12 +27,11 @@ class AdKitCapabilityTest extends TestCase
     {
         parent::setUp();
 
-        config()->set('services.adkit.enabled', true);
         config()->set('services.zernio.enabled', false);
         Http::preventStrayRequests();
     }
 
-    public function test_fresh_token_grants_are_hidden_until_adkit_is_enabled_and_assigned(): void
+    public function test_fresh_token_grants_are_hidden_until_an_adkit_account_is_assigned(): void
     {
         [$owner, $client] = $this->principal();
         $token = app(AgentTokenService::class)->issue($owner, $client, 'Fresh');
@@ -43,10 +42,6 @@ class AdKitCapabilityTest extends TestCase
         $this->withToken($token->plainTextToken)->getJson('/api/v1/context')->assertOk()
             ->assertJsonPath('capabilities', AgentAbility::clientTokenDefaults());
         $this->assignAdKit($owner, $client);
-        config()->set('services.adkit.enabled', false);
-        $this->withToken($token->plainTextToken)->getJson('/api/v1/capabilities')->assertOk()
-            ->assertJsonPath('capabilities', ['context.read', 'zernio.accounts.read', 'operations.read', 'zernio.posts.publish']);
-        config()->set('services.adkit.enabled', true);
         $this->withToken($token->plainTextToken)->getJson('/api/v1/capabilities')->assertOk()
             ->assertJsonPath('capabilities', [
                 'context.read', 'zernio.accounts.read', 'operations.read', ...self::ADKIT_READS, 'zernio.posts.publish',
@@ -71,7 +66,6 @@ class AdKitCapabilityTest extends TestCase
         Http::assertNothingSent();
     }
 
-    #[TestWith(['disabled'])]
     #[TestWith(['unassigned'])]
     #[TestWith(['foreign_client'])]
     #[TestWith(['permission'])]
@@ -90,6 +84,7 @@ class AdKitCapabilityTest extends TestCase
     #[TestWith(['empty_token'])]
     #[TestWith(['token_header'])]
     #[TestWith(['expired'])]
+    #[TestWith(['expires_now'])]
     #[TestWith(['corrupt_token'])]
     #[TestWith(['corrupt_profile'])]
     #[TestWith(['corrupt_account'])]
@@ -103,8 +98,7 @@ class AdKitCapabilityTest extends TestCase
         $token = app(AgentTokenService::class)->issue($owner, $client, 'Unready');
         $token->accessToken->update(['abilities' => ['context.read', ...self::ADKIT_READS]]);
         match ($reason) {
-            'disabled' => config()->set('services.adkit.enabled', false),
-            'unassigned' => $client->providerProfiles()->detach(),
+            'unassigned' => $client->accountPermissions()->delete(),
             'foreign_client' => $account->permissions()->update(['client_id' => Client::factory()->create()->id]),
             'permission' => $account->permissions()->update(['is_active' => false]),
             'inactive_account' => $account->update(['is_active' => false]),
@@ -122,6 +116,7 @@ class AdKitCapabilityTest extends TestCase
             'empty_token' => $connection->update(['access_token' => ' ']),
             'token_header' => $connection->update(['access_token' => "secret\r\ninvalid"]),
             'expired' => $connection->update(['access_token_expires_at' => now()->subSecond()]),
+            'expires_now' => $connection->update(['access_token_expires_at' => now()]),
             'corrupt_token' => DB::table('provider_connections')->where('id', $connection->id)->update(['access_token' => 'invalid-ciphertext']),
             'corrupt_profile' => DB::table('provider_profiles')->where('id', $profile->id)->update(['provider_id' => 'invalid-ciphertext']),
             'corrupt_account' => DB::table('provider_accounts')->where('id', $account->id)->update(['provider_id' => 'invalid-ciphertext']),
@@ -130,6 +125,42 @@ class AdKitCapabilityTest extends TestCase
         $this->withToken($token->plainTextToken)->getJson('/api/v1/capabilities')->assertOk()
             ->assertJsonPath('capabilities', ['context.read']);
 
+        if (! in_array($reason, ['unassigned', 'foreign_client', 'permission', 'token_scope'], true)) {
+            $loaded = $account->fresh(['profile.providerConnection']);
+            DB::enableQueryLog();
+            DB::flushQueryLog();
+            try {
+                $this->assertFalse($loaded->hasUsableAdKitConnection());
+                $this->assertCount(0, DB::getQueryLog());
+            } finally {
+                DB::disableQueryLog();
+            }
+        }
+
+        Http::assertNothingSent();
+    }
+
+    public function test_usable_connection_helper_uses_loaded_models_without_queries_or_project_assignments(): void
+    {
+        $this->freezeTime();
+        [$owner, $client] = $this->principal();
+        $account = $this->assignAdKit($owner, $client);
+        $client->providerProfiles()->detach();
+        $account->profile->providerConnection->update(['access_token_expires_at' => now()->addSecond()]);
+        $loaded = $account->fresh(['profile.providerConnection']);
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+
+        try {
+            $this->assertTrue($loaded->hasUsableAdKitConnection());
+            $this->assertCount(0, DB::getQueryLog());
+        } finally {
+            DB::disableQueryLog();
+        }
+        $token = app(AgentTokenService::class)->issue($owner, $client, 'No project assignment');
+        $token->accessToken->update(['abilities' => ['context.read', ...self::ADKIT_READS]]);
+        $this->withToken($token->plainTextToken)->getJson('/api/v1/capabilities')->assertOk()
+            ->assertJsonPath('capabilities', ['context.read', ...self::ADKIT_READS]);
         Http::assertNothingSent();
     }
 
@@ -328,7 +359,7 @@ class AdKitCapabilityTest extends TestCase
                 ->assertJsonPath('capabilities', ['context.read', 'zernio.accounts.read', 'operations.read', ...self::ADKIT_READS, 'zernio.posts.publish']);
 
             $queries = collect(DB::getQueryLog())->pluck('query')
-                ->filter(fn (string $sql): bool => str_starts_with($sql, 'select "id", "provider_profile_id", "provider_id" from "provider_accounts"'));
+                ->filter(fn (string $sql): bool => str_starts_with($sql, 'select "id", "provider_profile_id", "provider_id", "platform", "is_active" from "provider_accounts"'));
             $this->assertCount(2, $queries);
             foreach ($queries as $sql) {
                 $this->assertStringContainsString('limit 100', $sql);

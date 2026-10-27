@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\Client;
 use App\Models\ClientAccountPermission;
-use App\Models\ClientOperatorGrant;
 use App\Models\ProviderAccount;
 use App\Models\ProviderConnection;
 use App\Models\ProviderProfile;
@@ -179,14 +178,13 @@ class ClientProfileAssignmentService
 
     public function assertAssignmentAuthority(User $operator, Client $client): void
     {
-        $authorized = $operator->hasVerifiedEmail()
+        $operator = $operator->fresh();
+        $client = $client->fresh();
+        $authorized = $operator?->hasVerifiedEmail()
             && $operator->isAdmin()
-            && $client->is_active
-            && $client->users()->wherePivot('role', 'owner')->wherePivot('is_active', true)->exists()
-            && ClientOperatorGrant::query()
-                ->where('client_id', $client->id)
-                ->where('user_id', $operator->id)
-                ->where('is_active', true)
+            && $client?->is_active
+            && $client->users()->wherePivot('role', 'owner')->wherePivot('is_active', true)
+                ->whereNotNull('users.email_verified_at')
                 ->exists();
 
         abort_unless($authorized, 403);

@@ -51,7 +51,6 @@ return [
     ],
 
     'adkit' => [
-        'enabled' => env('ADKIT_AGENT_API_ENABLED', false),
         'api_key' => env('ADKIT_API_KEY'),
         'project_id' => env('ADKIT_PROJECT_ID'),
         'meta_account_id' => env('ADKIT_META_ACCOUNT_ID'),

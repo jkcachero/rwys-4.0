@@ -29,7 +29,7 @@ Route::prefix('v1')->middleware(['agent.response', 'auth:sanctum'])->group(funct
         ->middleware(['agent.ability:'.AgentAbility::ContextRead->value, 'agent.admit', 'agent.audit'])
         ->name('api.v1.capabilities');
     Route::post('/manage/platform-api-requests', AdKitBrokerController::class)
-        ->middleware(['agent.ability:'.AgentAbility::AdKitRead->value, 'agent.admit:read', 'agent.audit'])
+        ->middleware(['agent.client', 'agent.admit:provider', 'agent.audit'])
         ->name('api.v1.adkit.forward');
     Route::get('/zernio/accounts', [ZernioAccountController::class, 'index'])
         ->middleware(['agent.ability:'.AgentAbility::AccountsRead->value, 'agent.admit', 'agent.audit'])

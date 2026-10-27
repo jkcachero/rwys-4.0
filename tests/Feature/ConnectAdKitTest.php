@@ -29,16 +29,13 @@ class ConnectAdKitTest extends TestCase
         parent::setUp();
 
         config(['services.adkit' => [
-            'enabled' => true, 'api_key' => 'synthetic-secret', 'project_id' => 'synthetic-project',
+            'api_key' => 'synthetic-secret', 'project_id' => 'synthetic-project',
             'meta_account_id' => '123', 'base_url' => self::BASE,
             'timeout' => 10, 'connect_timeout' => 3, 'max_response_bytes' => 100000,
         ]]);
         Http::preventStrayRequests();
     }
 
-    #[TestWith(['enabled', false])]
-    #[TestWith(['enabled', null])]
-    #[TestWith(['enabled', 'true'])]
     #[TestWith(['api_key', null])]
     #[TestWith(['api_key', ' '])]
     #[TestWith(['api_key', "secret\r\nInjected: value"])]

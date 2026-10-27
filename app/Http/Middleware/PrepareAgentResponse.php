@@ -38,6 +38,10 @@ class PrepareAgentResponse
         }
 
         $response->headers->set('X-Request-Id', $requestId);
+        $operationId = $request->attributes->get('agent_operation_id');
+        if (is_string($operationId)) {
+            $response->headers->set('X-Operation-Id', $operationId);
+        }
         $response->headers->set('Cache-Control', 'no-store, private');
 
         return $response;

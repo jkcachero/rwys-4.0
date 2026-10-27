@@ -32,8 +32,7 @@ class ConnectAdKit extends Command
             $clientUuid = $this->argument('client');
             $operatorId = $this->option('operator');
 
-            if (config('services.adkit.enabled', false) !== true
-                || ! is_string($apiKey) || trim($apiKey) === '' || preg_match('/[\x00-\x1f\x7f]/', $apiKey)
+            if (! is_string($apiKey) || trim($apiKey) === '' || preg_match('/[\x00-\x1f\x7f]/', $apiKey)
                 || ! is_string($projectId) || trim($projectId) === '' || strlen($projectId) > 255 || preg_match('/[\x00-\x1f\x7f]/', $projectId)
                 || ! is_string($configuredAccount) || strlen($configuredAccount) > 255
                 || preg_match('/\A(?:act_)?([0-9]+)\z/', $configuredAccount, $accountMatch) !== 1

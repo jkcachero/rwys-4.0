@@ -11,6 +11,12 @@ class AdKitBrokerController extends Controller
 {
     public function __invoke(ForwardAdKitRequest $request, AdKitBrokerService $broker): JsonResponse
     {
-        return response()->json($broker->forward($request, $request->validated()));
+        $response = response()->json($broker->forward($request, $request->validated()));
+        $operationId = $request->attributes->get('agent_operation_id');
+        if (is_string($operationId)) {
+            $response->headers->set('X-Operation-Id', $operationId);
+        }
+
+        return $response;
     }
 }

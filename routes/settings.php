@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Settings\AdKitAccountAssignmentController;
 use App\Http\Controllers\Settings\AgentAccessController;
 use App\Http\Controllers\Settings\AgentProfileAssignmentController;
 use App\Http\Controllers\Settings\ProfileController;
@@ -42,8 +43,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('settings/agent-access', [AgentAccessController::class, 'edit'])->name('settings.agent-access.edit');
     Route::get('settings/agent-access/{client}/provider-profiles', [AgentProfileAssignmentController::class, 'profiles'])
         ->name('settings.agent-access.assignments.profiles');
+    Route::get('settings/agent-access/{client}/adkit-accounts', [AdKitAccountAssignmentController::class, 'index'])
+        ->name('settings.agent-access.adkit-accounts.index');
 
     Route::middleware(RequirePassword::class)->group(function () {
+        Route::post('settings/agent-access/{client}/adkit-accounts', [AdKitAccountAssignmentController::class, 'store'])
+            ->name('settings.agent-access.adkit-accounts.store');
+        Route::delete('settings/agent-access/{client}/adkit-accounts/{account}', [AdKitAccountAssignmentController::class, 'destroy'])
+            ->name('settings.agent-access.adkit-accounts.destroy');
         Route::post('settings/agent-access/{client}/provider-profiles', [AgentProfileAssignmentController::class, 'store'])
             ->name('settings.agent-access.assignments.store');
         Route::post('settings/agent-access/{client}/provider-profiles/{profile}/sync', [AgentProfileAssignmentController::class, 'sync'])

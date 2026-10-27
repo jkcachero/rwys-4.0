@@ -29,7 +29,7 @@ class AdKitBrokerApiTest extends TestCase
     {
         parent::setUp();
         config(['services.adkit' => [
-            'enabled' => true, 'base_url' => 'https://app.adkit.so/api/v1',
+            'base_url' => 'https://app.adkit.so/api/v1',
             'timeout' => 10, 'connect_timeout' => 3, 'max_response_bytes' => 100000,
         ]]);
         Http::preventStrayRequests();
@@ -116,7 +116,7 @@ class AdKitBrokerApiTest extends TestCase
     public static function invalidBodies(): array
     {
         return [
-            'inner write' => [['method' => 'POST']],
+            'write on a read-only provider edge' => [['method' => 'POST']],
             'platform' => [['platform' => 'google']],
             'provider secret' => [['api_key' => 'spoof']],
             'project' => [['projectId' => 'spoof']],
@@ -175,7 +175,7 @@ class AdKitBrokerApiTest extends TestCase
 
     #[TestWith(['none', 401])]
     #[TestWith(['revoked', 403])]
-    #[TestWith(['ability', 403])]
+    #[TestWith(['unbound', 403])]
     #[TestWith(['owner', 403])]
     #[TestWith(['client', 403])]
     #[TestWith(['scope', 404])]
@@ -188,11 +188,11 @@ class AdKitBrokerApiTest extends TestCase
         match ($case) {
             'none' => $token = '',
             'revoked' => $accessToken->update(['revoked_at' => now()]),
-            'ability' => $accessToken->update(['abilities' => ['context.read']]),
+            'unbound' => $accessToken->update(['client_id' => null]),
             'owner' => $client->users()->updateExistingPivot($accessToken->tokenable_id, ['is_active' => false]),
             'client' => $client->update(['is_active' => false]),
             'scope' => $accessToken->update(['allowed_account_ids' => [fake()->uuid()]]),
-            'assignment' => $client->providerProfiles()->detach(),
+            'assignment' => $client->accountPermissions()->delete(),
             'permission' => $account->permissions()->update(['is_active' => false]),
             'inactive' => $account->update(['is_active' => false]),
         };
@@ -204,7 +204,6 @@ class AdKitBrokerApiTest extends TestCase
     #[TestWith(['missing', 503])]
     #[TestWith(['expired', 503])]
     #[TestWith(['empty', 503])]
-    #[TestWith(['disabled', 503])]
     public function test_unusable_backend_configuration_does_not_call_upstream(string $case, int $status): void
     {
         [$token, , $account] = $this->context();
@@ -213,7 +212,6 @@ class AdKitBrokerApiTest extends TestCase
             'missing' => $account->profile->update(['provider_connection_id' => null]),
             'expired' => $account->profile->providerConnection->update(['access_token_expires_at' => now()->subDay()]),
             'empty' => $account->profile->providerConnection->update(['access_token' => '']),
-            'disabled' => config(['services.adkit.enabled' => false]),
         };
         $this->withToken($token)->postJson(self::URL, $this->body())->assertStatus($status);
         Http::assertNothingSent();
@@ -344,7 +342,7 @@ class AdKitBrokerApiTest extends TestCase
         Http::assertSentCount(2);
     }
 
-    public function test_seven_post_reads_use_only_read_buckets_and_do_not_enable_inner_writes(): void
+    public function test_post_reads_use_read_buckets_and_invalid_writes_use_write_buckets(): void
     {
         $this->freezeTime();
         [$token, $client, , $accessToken] = $this->context();
@@ -359,11 +357,11 @@ class AdKitBrokerApiTest extends TestCase
         }
         Http::assertSentCount(14);
         $this->withToken($token)->postJson(self::URL, [...$this->body(), 'method' => 'POST'])
-            ->assertUnprocessable()->assertJsonValidationErrors(['method']);
+            ->assertUnprocessable()->assertJsonValidationErrors(['endpoint']);
         Http::assertSentCount(14);
         foreach (['client' => $client->id, 'token' => $accessToken->id] as $kind => $id) {
-            $this->assertSame(8, RateLimiter::attempts("agent:read:{$kind}:{$id}"));
-            $this->assertSame(0, RateLimiter::attempts("agent:write:{$kind}:{$id}"));
+            $this->assertSame(7, RateLimiter::attempts("agent:read:{$kind}:{$id}"));
+            $this->assertSame(1, RateLimiter::attempts("agent:write:{$kind}:{$id}"));
         }
     }
 
