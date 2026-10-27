@@ -17,6 +17,9 @@ class UpdateAgentPermissionRequest extends FormRequest
         return $client instanceof Client
             && $permission instanceof ClientAccountPermission
             && $permission->client_id === $client->id
+            && ! $permission->account()
+                ->whereHas('profile', fn ($query) => $query->where('provider', 'adkit'))
+                ->exists()
             && $this->user()?->hasVerifiedEmail()
             && $client->is_active
             && $client->hasActiveOwner($this->user());

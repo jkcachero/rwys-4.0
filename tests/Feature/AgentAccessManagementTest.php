@@ -244,6 +244,58 @@ class AgentAccessManagementTest extends TestCase
         $this->assertTrue($permission->fresh()->can_schedule);
     }
 
+    public function test_client_owners_cannot_restore_admin_revoked_adkit_permissions(): void
+    {
+        $owner = User::factory()->create(['email_verified_at' => now()]);
+        $formerClient = Client::factory()->create();
+        $currentClient = Client::factory()->create();
+        $formerClient->users()->attach($owner, ['role' => 'owner', 'is_active' => true]);
+        $profile = ProviderProfile::factory()->create(['provider' => 'adkit']);
+        $account = ProviderAccount::factory()->for($profile, 'profile')->create();
+        $revokedPermission = ClientAccountPermission::factory()->create([
+            'client_id' => $formerClient->id,
+            'provider_account_id' => $account->id,
+            'is_active' => false,
+            'can_schedule' => false,
+        ]);
+
+        $this->actingAs($owner)
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->patch(route('settings.agent-access.permissions.update', [
+                'client' => $formerClient->public_id,
+                'permission' => $revokedPermission,
+            ]), [
+                'is_active' => true,
+                'can_schedule' => true,
+            ])->assertForbidden();
+
+        $this->assertFalse($revokedPermission->fresh()->is_active);
+        $this->assertFalse($revokedPermission->fresh()->can_schedule);
+
+        ClientAccountPermission::factory()->create([
+            'client_id' => $currentClient->id,
+            'provider_account_id' => $account->id,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($owner)
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->patch(route('settings.agent-access.permissions.update', [
+                'client' => $formerClient->public_id,
+                'permission' => $revokedPermission,
+            ]), [
+                'is_active' => true,
+                'can_schedule' => true,
+            ])->assertForbidden();
+
+        $this->assertFalse($revokedPermission->fresh()->is_active);
+        $this->assertFalse($revokedPermission->fresh()->can_schedule);
+        $this->assertTrue(ClientAccountPermission::query()
+            ->whereBelongsTo($currentClient)
+            ->whereBelongsTo($account, 'account')
+            ->value('is_active'));
+    }
+
     public function test_owner_can_issue_rotate_and_revoke_a_finite_client_bound_token(): void
     {
         $owner = User::factory()->create(['email_verified_at' => now()]);
