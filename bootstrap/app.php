@@ -25,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'agent.response' => PrepareAgentResponse::class,
             'agent.ability' => AuthorizeAgentRequest::class,
+            'agent.client' => AuthorizeAgentRequest::class,
             'agent.audit' => AuditAgentRequest::class,
             'agent.admit' => AdmitAgentRequest::class,
         ]);

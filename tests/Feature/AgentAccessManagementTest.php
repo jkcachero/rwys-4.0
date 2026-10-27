@@ -9,6 +9,7 @@ use App\Models\PersonalAccessToken;
 use App\Models\ProviderAccount;
 use App\Models\ProviderProfile;
 use App\Models\User;
+use App\Services\AgentTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -16,6 +17,141 @@ use Tests\TestCase;
 class AgentAccessManagementTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_admin_roster_lists_assigned_users_and_provider_account_counts(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $owner = User::factory()->create(['name' => 'John Karlo']);
+        $client = Client::factory()->create(['name' => 'John Client']);
+        $unassigned = Client::factory()->create(['name' => 'Unassigned']);
+        $client->users()->attach($owner, ['role' => 'owner', 'is_active' => true]);
+        $unassigned->users()->attach(User::factory()->create(), ['role' => 'owner', 'is_active' => true]);
+        $profile = ProviderProfile::factory()->create(['provider' => 'zernio']);
+        $client->providerProfiles()->attach($profile, ['assigned_by' => $admin->id, 'assigned_at' => now()]);
+        ClientAccountPermission::factory()->create([
+            'client_id' => $client,
+            'provider_account_id' => ProviderAccount::factory()->create(['provider_profile_id' => $profile]),
+        ]);
+        $adProfile = ProviderProfile::factory()->create(['provider' => 'adkit']);
+        foreach ([true, false] as $active) {
+            ClientAccountPermission::factory()->create([
+                'client_id' => $client,
+                'provider_account_id' => ProviderAccount::factory()->create(['provider_profile_id' => $adProfile, 'platform' => 'meta']),
+                'is_active' => $active,
+            ]);
+        }
+
+        $this->actingAs($admin)->get(route('settings.agent-access.edit'))
+            ->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->has('clients', 2)
+            ->has('assigned_users', 1)
+            ->where('assigned_users.0.id', $client->public_id)
+            ->where('assigned_users.0.owner.name', 'John Karlo')
+            ->where('assigned_users.0.social_account_count', 1)
+            ->where('assigned_users.0.ad_account_count', 1)
+            ->where('selectedClient.id', $client->public_id)
+            ->where('can_assign_accounts', true)
+            ->missing('assigned_users.0.tokens')
+            ->missing('assigned_users.0.provider_connection'));
+    }
+
+    public function test_assigned_users_roster_does_not_expose_other_clients_to_a_regular_owner(): void
+    {
+        $owner = User::factory()->create();
+        $own = Client::factory()->create();
+        $foreign = Client::factory()->create();
+        $own->users()->attach($owner, ['role' => 'owner', 'is_active' => true]);
+        $foreign->users()->attach(User::factory()->create(), ['role' => 'owner', 'is_active' => true]);
+        foreach ([$own, $foreign] as $client) {
+            $profile = ProviderProfile::factory()->create(['provider' => 'adkit']);
+            ClientAccountPermission::factory()->create([
+                'client_id' => $client,
+                'provider_account_id' => ProviderAccount::factory()->create(['provider_profile_id' => $profile, 'platform' => 'meta']),
+            ]);
+        }
+
+        $this->actingAs($owner)->get(route('settings.agent-access.edit'))
+            ->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->has('clients', 1)
+            ->has('assigned_users', 1)
+            ->where('assigned_users.0.id', $own->public_id)
+            ->where('can_assign_accounts', false));
+    }
+
+    public function test_assigned_users_are_paginated_independently_from_the_user_directory(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $clients = Client::factory()->count(26)->create();
+        foreach ($clients as $client) {
+            $client->users()->attach($admin, ['role' => 'owner', 'is_active' => true]);
+            $profile = ProviderProfile::factory()->create(['provider' => 'zernio']);
+            $client->providerProfiles()->attach($profile, ['assigned_at' => now()]);
+        }
+
+        $this->actingAs($admin)->get(route('settings.agent-access.edit'))
+            ->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->has('assigned_users', 25)
+            ->where('assigned_users_pagination.page', 1)
+            ->where('assigned_users_pagination.has_more', true));
+        $this->get(route('settings.agent-access.edit', ['assigned_page' => 2]))
+            ->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->has('assigned_users', 1)
+            ->where('assigned_users_pagination.page', 2)
+            ->where('assigned_users_pagination.has_more', false));
+    }
+
+    public function test_key_management_shows_only_current_keys_and_retains_hidden_records(): void
+    {
+        $owner = User::factory()->create(['email_verified_at' => now()]);
+        $client = Client::factory()->create();
+        $otherClient = Client::factory()->create();
+        foreach ([$client, $otherClient] as $ownedClient) {
+            $ownedClient->users()->attach($owner, ['role' => 'owner', 'is_active' => true]);
+        }
+        $tokens = app(AgentTokenService::class);
+        $active = $tokens->issue($owner, $client, 'Current key')->accessToken;
+        $revoked = $tokens->issue($owner, $client, 'Revoked key')->accessToken;
+        $tokens->revoke($owner, $client, $revoked);
+        $expired = $tokens->issue($owner, $client, 'Expired key')->accessToken;
+        $expired->forceFill(['expires_at' => now()->subMinute()])->save();
+        $tokens->issue($owner, $otherClient, 'Other client key');
+
+        $this->actingAs($owner)
+            ->get(route('settings.agent-access.edit', ['client' => $client->public_id]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('selectedClient.tokens', 1)
+                ->where('selectedClient.tokens.0.id', $active->id));
+
+        $this->withSession(['auth.password_confirmed_at' => time()])
+            ->delete(route('settings.agent-access.tokens.destroy', [
+                'client' => $client,
+                'token' => $active,
+            ]))->assertRedirect();
+
+        $this->get(route('settings.agent-access.edit', ['client' => $client->public_id]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->has('selectedClient.tokens', 0));
+
+        $this->assertDatabaseCount('personal_access_tokens', 4);
+        $this->assertNotNull($active->fresh()->revoked_at);
+    }
+
+    public function test_one_time_plaintext_key_is_only_shown_for_its_selected_client(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $own = Client::factory()->create();
+        $other = Client::factory()->create();
+        $own->users()->attach($admin, ['role' => 'owner', 'is_active' => true]);
+        $other->users()->attach(User::factory()->create(), ['role' => 'owner', 'is_active' => true]);
+        $flash = ['agent_token_plaintext' => 'synthetic-one-time-key', 'agent_token_client_id' => $own->public_id];
+
+        $this->actingAs($admin)->withSession($flash)
+            ->get(route('settings.agent-access.edit', ['client' => $other->public_id]))
+            ->assertOk()->assertInertia(fn (Assert $page) => $page->missing('token_plaintext'));
+        $this->withSession($flash)->get(route('settings.agent-access.edit', ['client' => $own->public_id]))
+            ->assertOk()->assertInertia(fn (Assert $page) => $page->where('token_plaintext', 'synthetic-one-time-key'));
+    }
 
     public function test_active_client_members_can_view_only_their_agent_access_clients(): void
     {

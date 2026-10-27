@@ -15,7 +15,7 @@ class AdmitAgentRequest
     public function __construct(private readonly AgentAdmissionService $admission) {}
 
     /** @param Closure(Request): Response $next */
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next, string $mode = 'auto'): Response
     {
         $client = $request->attributes->get('agent_client');
         $token = $request->attributes->get('agent_token');
@@ -24,7 +24,10 @@ class AdmitAgentRequest
             return $this->denied('forbidden', 'Agent authorization context is unavailable.', 403);
         }
 
-        $retryAfter = $this->admission->rateLimit($client, $token, ! $request->isMethodSafe());
+        $write = $mode === 'provider'
+            ? $request->input('method') !== 'GET'
+            : ($mode !== 'read' && ! $request->isMethodSafe());
+        $retryAfter = $this->admission->rateLimit($client, $token, $write);
 
         if ($retryAfter !== null) {
             return $this->denied('rate_limited', 'The agent request limit was exceeded.', 429, $retryAfter);

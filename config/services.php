@@ -50,4 +50,14 @@ return [
         'max_response_bytes' => 1_048_576,
     ],
 
+    'adkit' => [
+        'api_key' => env('ADKIT_API_KEY'),
+        'project_id' => env('ADKIT_PROJECT_ID'),
+        'meta_account_id' => env('ADKIT_META_ACCOUNT_ID'),
+        'base_url' => 'https://app.adkit.so/api/v1',
+        'connect_timeout' => 5,
+        'timeout' => 10,
+        'max_response_bytes' => 1_048_576,
+    ],
+
 ];

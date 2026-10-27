@@ -11,8 +11,6 @@ use App\Zernio\ZernioHttpClient;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
-use Inertia\Inertia;
-use Inertia\Response;
 use Throwable;
 
 class ProviderConnectionController
@@ -22,30 +20,6 @@ class ProviderConnectionController
         private readonly InferenceService $inference,
         private readonly ZernioHttpClient $zernio,
     ) {}
-
-    public function index(Request $request): Response
-    {
-        $this->authorizeAdmin($request);
-
-        $connections = $request->user()->providerConnections()
-            ->get(['provider', 'subject', 'access_token_expires_at', 'scopes'])
-            ->keyBy('provider');
-
-        return Inertia::render('settings/connections', [
-            'providers' => collect(config('workspace.providers'))->map(
-                fn (array $provider, string $name): array => [
-                    'name' => $name,
-                    'label' => $provider['label'],
-                    'model' => $provider['model'],
-                    'authentication' => $provider['authentication'],
-                    'capabilities' => $provider['capabilities'],
-                    'message' => $provider['message'] ?? null,
-                    'connected' => $connections->has($name),
-                    'expiresAt' => $connections->get($name)?->access_token_expires_at?->toIso8601String(),
-                ],
-            )->values()->all(),
-        ]);
-    }
 
     public function connectOpenAi(Request $request): RedirectResponse
     {
@@ -84,7 +58,7 @@ class ProviderConnectionController
             ],
         );
 
-        return to_route('connections.edit')->with('status', 'Zernio is connected for profile assignment.');
+        return to_route('settings.agent-access.edit')->with('status', 'Zernio is connected for profile assignment.');
     }
 
     public function callback(Request $request): RedirectResponse
@@ -97,10 +71,10 @@ class ProviderConnectionController
         try {
             $this->oauth->complete($request->string('code')->toString(), $request->string('state')->toString());
         } catch (Throwable) {
-            return redirect()->route('connections.edit')->with('error', 'OpenAI authorization could not be completed.');
+            return redirect()->route('settings.agent-access.edit')->with('error', 'OpenAI authorization could not be completed.');
         }
 
-        return redirect()->route('connections.edit')->with('status', 'OpenAI is connected for inference.');
+        return redirect()->route('settings.agent-access.edit')->with('status', 'OpenAI is connected for inference.');
     }
 
     public function test(Request $request, string $provider): RedirectResponse
@@ -123,10 +97,10 @@ class ProviderConnectionController
                 );
             }
         } catch (Throwable) {
-            return to_route('connections.edit')->with('error', 'The provider connection test could not be completed.');
+            return to_route('settings.agent-access.edit')->with('error', 'The provider connection test could not be completed.');
         }
 
-        return to_route('connections.edit')->with('status', 'Provider connection test completed.');
+        return to_route('settings.agent-access.edit')->with('status', 'Provider connection test completed.');
     }
 
     public function disconnect(Request $request, string $provider): RedirectResponse
@@ -140,7 +114,7 @@ class ProviderConnectionController
             $request->user()->providerConnections()->where('provider', 'zernio')->delete();
         }
 
-        return to_route('connections.edit')->with('status', 'Provider disconnected.');
+        return to_route('settings.agent-access.edit')->with('status', 'Provider disconnected.');
     }
 
     private function authorizeAdmin(Request $request): void
