@@ -11,15 +11,16 @@ use App\Models\ProviderProfile;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\TestWith;
 use Tests\TestCase;
 
 class AgentProfileAssignmentTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_verified_admin_with_explicit_grant_can_discover_zernio_profiles_for_an_eligible_client(): void
+    public function test_verified_admin_can_discover_zernio_profiles_without_an_operator_grant(): void
     {
-        [$operator, $client] = $this->operatorAndClient();
+        [$operator, $client] = $this->operatorAndClient(granted: false);
         $this->zernioConnection($operator);
         config(['services.zernio.enabled' => true]);
         Http::preventStrayRequests();
@@ -49,9 +50,9 @@ class AgentProfileAssignmentTest extends TestCase
         Http::assertSent(fn ($request): bool => $request->url() === 'https://zernio.test/v1/profiles?limit=25&skip=0');
     }
 
-    public function test_operator_grant_exposes_the_client_and_assignment_controls_without_owner_token_controls(): void
+    public function test_admin_can_see_assignment_controls_without_a_grant_but_not_owner_token_controls(): void
     {
-        [$operator, $client, $owner] = $this->operatorAndClient();
+        [$operator, $client, $owner] = $this->operatorAndClient(granted: false);
 
         $this->actingAs($operator)
             ->get(route('settings.agent-access.edit'))
@@ -68,9 +69,11 @@ class AgentProfileAssignmentTest extends TestCase
             );
     }
 
-    public function test_admin_role_without_active_assignment_grant_cannot_discover_or_assign_profiles(): void
+    public function test_non_admin_with_an_operator_grant_cannot_discover_or_assign_profiles(): void
     {
-        [$operator, $client] = $this->operatorAndClient(granted: false);
+        [$operator, $client] = $this->operatorAndClient();
+        $operator->update(['role' => 'user']);
+        Http::preventStrayRequests();
 
         $this->actingAs($operator)
             ->getJson(route('settings.agent-access.assignments.profiles', $client))
@@ -81,11 +84,13 @@ class AgentProfileAssignmentTest extends TestCase
             ->post(route('settings.agent-access.assignments.store', $client), [
                 'provider_profile_id' => 'profile-1',
             ])->assertForbidden();
+
+        Http::assertNothingSent();
     }
 
     public function test_operator_can_atomically_assign_a_complete_profile_and_defaults_new_accounts_to_read_only(): void
     {
-        [$operator, $client] = $this->operatorAndClient();
+        [$operator, $client] = $this->operatorAndClient(granted: false);
         $connection = $this->zernioConnection($operator);
         config(['services.zernio.enabled' => true]);
         Http::preventStrayRequests();
@@ -135,6 +140,28 @@ class AgentProfileAssignmentTest extends TestCase
         $this->assertCount(2, $permissions);
         $this->assertTrue($permissions->every->is_active);
         $this->assertTrue($permissions->every(fn (ClientAccountPermission $permission): bool => ! $permission->can_schedule));
+        $this->assertDatabaseCount('client_operator_grants', 0);
+    }
+
+    #[TestWith(['unverified admin'])]
+    #[TestWith(['inactive client'])]
+    #[TestWith(['unverified owner'])]
+    #[TestWith(['inactive owner'])]
+    public function test_assignment_requires_current_verified_admin_and_active_verified_client_ownership(string $reason): void
+    {
+        [$operator, $client, $owner] = $this->operatorAndClient(granted: false);
+        match ($reason) {
+            'unverified admin' => $operator->forceFill(['email_verified_at' => null])->save(),
+            'inactive client' => $client->update(['is_active' => false]),
+            'unverified owner' => $owner->forceFill(['email_verified_at' => null])->save(),
+            'inactive owner' => $client->users()->updateExistingPivot($owner->id, ['is_active' => false]),
+        };
+        Http::preventStrayRequests();
+
+        $this->actingAs($operator)->getJson(route('settings.agent-access.assignments.profiles', $client))
+            ->assertForbidden();
+
+        Http::assertNothingSent();
     }
 
     public function test_assignment_rejects_an_incomplete_or_wrong_profile_snapshot_without_persisting_any_mapping(): void

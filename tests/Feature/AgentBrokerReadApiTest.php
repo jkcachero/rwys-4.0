@@ -36,8 +36,16 @@ class AgentBrokerReadApiTest extends TestCase
         $response = $this->withToken($token)->getJson('/api/v1/capabilities');
 
         $response->assertOk()
-            ->assertJsonPath('capabilities', AgentAbility::readOnly())
+            ->assertJsonPath('capabilities', [
+                AgentAbility::ContextRead->value,
+                AgentAbility::AccountsRead->value,
+                AgentAbility::PostsRead->value,
+                AgentAbility::AnalyticsRead->value,
+                AgentAbility::OperationsRead->value,
+            ])
             ->assertJsonMissing([AgentAbility::PostsPublish->value]);
+
+        Http::assertNothingSent();
     }
 
     public function test_zernio_reads_verify_provider_identity_and_return_only_local_ids(): void

@@ -35,6 +35,7 @@ class AgentReadApiTest extends TestCase
         [$token, $client] = $this->agentToken([AgentAbility::AccountsRead->value]);
         $visible = ProviderAccount::factory()->create();
         $hidden = ProviderAccount::factory()->create();
+        $client->providerProfiles()->attach([$visible->provider_profile_id, $hidden->provider_profile_id], ['assigned_at' => now()]);
         ClientAccountPermission::factory()->create(['client_id' => $client, 'provider_account_id' => $visible]);
         ClientAccountPermission::factory()->create([
             'client_id' => $client,
@@ -56,6 +57,7 @@ class AgentReadApiTest extends TestCase
         $client->users()->attach($owner, ['role' => 'owner', 'is_active' => true]);
         $allowed = ProviderAccount::factory()->create();
         $excluded = ProviderAccount::factory()->create();
+        $client->providerProfiles()->attach([$allowed->provider_profile_id, $excluded->provider_profile_id], ['assigned_at' => now()]);
         ClientAccountPermission::factory()->create(['client_id' => $client, 'provider_account_id' => $allowed]);
         ClientAccountPermission::factory()->create(['client_id' => $client, 'provider_account_id' => $excluded]);
         $token = app(AgentTokenService::class)->issue(
@@ -71,6 +73,30 @@ class AgentReadApiTest extends TestCase
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', $allowed->public_id)
             ->assertJsonMissing(['id' => $excluded->public_id]);
+    }
+
+    public function test_zernio_account_listing_excludes_other_providers_and_unassigned_profiles(): void
+    {
+        [$token, $client] = $this->agentToken([AgentAbility::AccountsRead->value]);
+        $visible = ProviderAccount::factory()->create();
+        $adkit = ProviderAccount::factory()->create(['platform' => 'meta']);
+        $adkit->profile->update(['provider' => 'adkit']);
+        $inactive = ProviderAccount::factory()->create();
+        $inactive->profile->update(['is_active' => false]);
+        $unassigned = ProviderAccount::factory()->create();
+        $client->providerProfiles()->attach([
+            $visible->provider_profile_id,
+            $adkit->provider_profile_id,
+            $inactive->provider_profile_id,
+        ], ['assigned_at' => now()]);
+        foreach ([$visible, $adkit, $inactive, $unassigned] as $account) {
+            ClientAccountPermission::factory()->create(['client_id' => $client, 'provider_account_id' => $account]);
+        }
+
+        $this->withToken($token)->getJson('/api/v1/zernio/accounts')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $visible->public_id);
     }
 
     public function test_request_is_denied_when_the_issuing_owner_loses_access(): void

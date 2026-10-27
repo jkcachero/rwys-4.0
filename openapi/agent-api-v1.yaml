@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
     title: RWYS Agent API
     version: 1.0.0
-    description: Curated client-scoped Zernio proxy with fixed read and publish capabilities, RWYS tenancy enforcement, and durable writes.
+    description: Curated client-scoped Zernio capabilities and an assigned-account AdKit read/write provider broker. Callers authenticate only with the RWYS Sanctum Bearer API_KEY; provider credentials and project context are internal. AdKit preserves raw provider identifiers and payloads, unlike Zernio local UUID resources. Response middleware adds request_id to success and error JSON envelopes.
 servers:
     - url: /api/v1
 security:
@@ -37,6 +37,159 @@ paths:
                 '403': { $ref: '#/components/responses/Forbidden' }
                 '422': { $ref: '#/components/responses/Unprocessable' }
                 '429': { $ref: '#/components/responses/RateLimited' }
+    /manage/platform-api-requests:
+        post:
+            operationId: forwardAdKitRequest
+            x-agent-ability: null
+            x-agent-authorization: client-assigned-account
+            description: >-
+                Forwards the documented AdKit provider request using only Authorization Bearer API_KEY
+                (the RWYS Sanctum token). Provider credentials and project context are injected internally;
+                no caller-supplied provider key or project header is required. Caller project headers are
+                ignored and never forwarded; provider credential fields in the body are rejected. The upstream host
+                and project are not Client-selected. A verified admin must first assign the individual AdKit
+                account to the Client through Agent Access. Project visibility alone grants no account access,
+                and a global admin's Client Bearer does not inherit global provider access. Removal immediately
+                blocks existing keys; separate Clients may hold different accounts in the same project. The host
+                is fixed and not caller-controlled. Every valid Client-bound Bearer key has read/write access
+                to its assigned accounts, narrowed by the optional existing token allowed_account_ids scope.
+                The route uses agent.client (AuthorizeAgentRequest with default ability null) and
+                agent.admit:provider. Neither adkit.read nor adkit.write is a token permission gate here;
+                read/write capabilities describe provider operations, not new permissions or token grants.
+                GET supports an authorized act_target root, campaigns, adsets, ads, insights, adcreatives,
+                adimages, a numeric object ID, or numeric/adsets, numeric/ads and numeric/insights, with
+                accountId required for all numeric paths to identify the assigned target account.
+                Numeric parent ownership is verified before the projected read. Numeric child adsets must
+                reference that campaign; child ads must reference that campaign or adset. Injected ownership
+                and parent foreign-key fields are removed from the returned projection unless requested.
+                POST supports creates only
+                on act_target/campaigns, adsets, adcreatives, adimages and ads, not arbitrary paths or updates.
+                For account-prefixed endpoints, accountId may be omitted or match the target or stored connection
+                context; RWYS injects the stored context upstream. Parent campaign, adset and creative ownership,
+                page membership, Instagram association and image hashes are verified where applicable.
+                POST requires an Idempotency-Key of 8 to 200 characters, safe metadata rather than a credential.
+                Only POST accepts the query parameter publish: true executes the provider POST; omitted or false
+                requests a draft only. publish is not a body or payload field. Client chooses budget and status;
+                there is no forced PAUSED status or budget, and no provider enable flags. PAUSED in the campaign
+                example is an example only, not policy. ACTIVE is covered by fakes; no live activation is approved.
+                Draft behavior currently has synthetic fixtures only, not live verification: transport accepts
+                status draft or pending plus a nonblank draftId, never proof of activation or execution.
+                Published receipts require status published and results with raw provider IDs or image hashes.
+                Responses preserve the read, published or draft provider envelopes with credential redaction
+                and middleware request_id. Once a write operation exists, X-Operation-Id is its UUID on success
+                and errors; pre-ledger failures have no operation header. Recover through the existing Client-owned
+                /operations and /operations/{operation} routes (their operations.read ability is unchanged).
+                Reusing an idempotency key with changed intent yields adkit_idempotency_conflict (409); an in-flight operation
+                yields adkit_operation_pending (409). Completed receipts replay without redispatch after fresh
+                authorization. Unconfirmed execution yields adkit_unconfirmed (503): do not retry with a new
+                idempotency key. A confirmed receipt that cannot be saved to the ledger instead returns
+                adkit_receipt_persistence_failed (503) with provider_status, resource_ids and image_hashes,
+                plus request_id and X-Operation-Id. This is not an ambiguous provider execution failure.
+                Replay only with the same idempotency key. A local encrypted receipt journal is attempted
+                only when saving the confirmed receipt to the database fails; it is not a distributed guarantee.
+                Recovery verifies Client, account, operation and payload bindings, rechecks authorization and
+                attempts ledger persistence without redispatch. An unverifiable journal returns the flat
+                adkit_receipt_journal_invalid (503) error and must not trigger redispatch.
+                adkit_draft_unsupported (503) denotes an unsupported draft receipt at the transport boundary;
+                after dispatch the write service conservatively reports adkit_unconfirmed instead.
+                Provider IDs and metrics are preserved
+                without local campaign UUID mappings or normalized rows. Source provenance: direct-provider curl
+                against AdKit Meta ads on 2026-10-26 returned populated account stats, including spend 180.28.
+                That historical evidence verifies the upstream contract, not live RWYS forwarding by itself.
+                Subsequent operator-reported live curl through the RWYS broker verified paused writes using
+                the existing Client-bound Bearer with its database-confirmed abilities unchanged, internal
+                provider credentials and project context only, and no direct AdKit mutations. Campaign
+                52550713256771 was created with shared daily budget 300 in USD minor units and configured
+                and effective status PAUSED. Adsets 52550713606571 and 52550713714771 were created PAUSED
+                under that campaign, each with three ads named APITEST. The first set's ads were
+                52550713892171, 52550713890571 and 52550714103571; the second set's ads were
+                52550714101771, 52550714143571 and 52550714142571. All six were configured PAUSED;
+                52550714143571 last reported effective status PENDING_REVIEW, the others PAUSED.
+                There were nine succeeded operation records owned by the same Charlie Client and scoped
+                assigned account; the campaign operation was 01a17b47-3246-72e1-9583-01d13c6d13cc.
+                Campaign replay with the same idempotency key returned 200 with the same provider campaign
+                and operation UUID, leaving the record count at nine. A negative write to another Client's
+                account returned 404 with no provider results or operation record (request_id
+                89885050-9dad-4376-bf0a-87eed9ac9d7e). Live RWYS reads also returned 200 for image-hash
+                lookup and creative metadata including account_id. This paused-write evidence is not live
+                activation approval; draft status remains untested live and covered by synthetic fixtures only.
+                The route retains automated fake-backed coverage. AdKit requires no enable/disable configuration switch. The read example requests
+                ad-level insights for August 26 through October 26. Pagination remains provider-owned.
+            parameters:
+                - $ref: '#/components/parameters/AdKitPublish'
+                - $ref: '#/components/parameters/AdKitIdempotencyKey'
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            { $ref: '#/components/schemas/AdKitForwardRequest' }
+                        examples:
+                            readInsights:
+                                summary: GET read through the POST broker route; no publish query or idempotency header needed.
+                                value:
+                                    platform: meta
+                                    endpoint: act_1185818863112933/insights
+                                    method: GET
+                                    description: Read Meta ad stats from August 26 through October 26
+                                    payload:
+                                        fields: account_id,campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,impressions,reach,clicks,spend,cpc,cpm,ctr,date_start,date_stop
+                                        time_range: '{"since":"2026-08-26","until":"2026-10-26"}'
+                                        level: ad
+                                        limit: 25
+                            createCampaign:
+                                summary: POST campaign create; send Idempotency-Key campaign-create-001. Add query publish=true to execute, otherwise draft only. PAUSED is not policy.
+                                value:
+                                    platform: meta
+                                    endpoint: act_1185818863112933/campaigns
+                                    method: POST
+                                    description: Create a Meta campaign
+                                    payload:
+                                        name: Example campaign
+                                        objective: OUTCOME_TRAFFIC
+                                        status: PAUSED
+                                        daily_budget: '1879'
+                                        special_ad_categories: '[]'
+            responses:
+                '200':
+                    description: Read, published or draft provider forwarding envelope; middleware adds request_id. Empty read results do not imply zero activity. A draft receipt is not execution.
+                    headers:
+                        X-Operation-Id:
+                            description: Client-owned write operation UUID, present once the ledger entry exists; absent for reads.
+                            schema: { type: string, format: uuid }
+                    content:
+                        application/json:
+                            schema:
+                                {
+                                    $ref: '#/components/schemas/AdKitForwardResponse',
+                                }
+                '401': { $ref: '#/components/responses/Unauthorized' }
+                '403':
+                    description: Client or token authorization failed, including authority revoked during a write.
+                    headers:
+                        X-Operation-Id:
+                            description: Client-owned operation UUID when a ledger entry already exists.
+                            schema: { type: string, format: uuid }
+                    content:
+                        application/json:
+                            schema:
+                                { $ref: '#/components/schemas/ErrorResponse' }
+                '404':
+                    description: Assigned target or verified parent resource not found, including assignment revoked during a write.
+                    headers:
+                        X-Operation-Id:
+                            description: Client-owned operation UUID when a ledger entry already exists.
+                            schema: { type: string, format: uuid }
+                    content:
+                        application/json:
+                            schema:
+                                { $ref: '#/components/schemas/ErrorResponse' }
+                '409': { $ref: '#/components/responses/AdKitConflict' }
+                '422': { $ref: '#/components/responses/Unprocessable' }
+                '429': { $ref: '#/components/responses/RateLimited' }
+                '502': { $ref: '#/components/responses/AdKitProviderError' }
+                '503':
+                    { $ref: '#/components/responses/AdKitProviderUnavailable' }
     /zernio/accounts:
         get:
             operationId: listZernioAccounts
@@ -285,7 +438,55 @@ components:
             in: header
             required: true
             schema: { type: string, minLength: 8, maxLength: 200 }
+        AdKitPublish:
+            name: publish
+            in: query
+            required: false
+            description: Only allowed for body method POST. true executes the provider POST; false or omitted requests a draft only. GET rejects all query parameters.
+            schema: { type: boolean, default: false }
+        AdKitIdempotencyKey:
+            name: Idempotency-Key
+            in: header
+            required: false
+            description: Required for method POST, including drafts; optional and unused for GET. Safe request metadata, not a credential. Must contain 8 to 200 characters and no control characters. Reuse for the same intent; never use a new idempotency key to retry unconfirmed execution.
+            schema:
+                {
+                    type: string,
+                    minLength: 8,
+                    maxLength: 200,
+                    pattern: '^[^\x00-\x1f\x7f]*$',
+                }
     responses:
+        AdKitConflict:
+            description: Changed intent for an existing idempotency key (adkit_idempotency_conflict) or operation still pending (adkit_operation_pending), both 409. Safe flat error envelope without provider diagnostics.
+            headers:
+                X-Operation-Id:
+                    description: Existing Client-owned operation UUID.
+                    schema: { type: string, format: uuid }
+            content:
+                application/json:
+                    schema: { $ref: '#/components/schemas/AdKitErrorResponse' }
+        AdKitProviderError:
+            description: AdKit authentication failure, invalid or oversized response, invalid request, or provider error (502). Safe flat error/message envelope with middleware request_id, never raw provider diagnostics.
+            headers:
+                X-Operation-Id:
+                    description: Client-owned write operation UUID when a ledger entry exists, including errors.
+                    schema: { type: string, format: uuid }
+            content:
+                application/json:
+                    schema: { $ref: '#/components/schemas/AdKitErrorResponse' }
+        AdKitProviderUnavailable:
+            description: Configuration or credentials unavailable, invalid mapping, unreachable provider, provider rate limit, adkit_unconfirmed, adkit_draft_unsupported or adkit_receipt_journal_invalid (503) use the safe flat error/message envelope. Confirmed receipt persistence failure uses a separate recovery envelope with provider status and resource identifiers. Middleware adds request_id and the operation UUID header when available. Unconfirmed writes must not be repeated with a new idempotency key; inspect the existing operation.
+            headers:
+                X-Operation-Id:
+                    description: Client-owned write operation UUID when a ledger entry exists, including errors.
+                    schema: { type: string, format: uuid }
+            content:
+                application/json:
+                    schema:
+                        oneOf:
+                            - $ref: '#/components/schemas/AdKitErrorResponse'
+                            - $ref: '#/components/schemas/AdKitReceiptPersistenceErrorResponse'
         Unauthorized:
             description: Bearer authentication is missing or invalid.
             content:
@@ -336,6 +537,7 @@ components:
             format: uuid
         Ability:
             type: string
+            description: Existing token ability defaults, unchanged. Assigned-account AdKit read/write provider operations require no additional token permission.
             enum:
                 - context.read
                 - zernio.accounts.read
@@ -343,6 +545,487 @@ components:
                 - zernio.analytics.read
                 - operations.read
                 - zernio.posts.publish
+        AdKitForwardRequest:
+            type: object
+            additionalProperties: false
+            required: [platform, endpoint, method, description, payload]
+            properties:
+                platform: { type: string, const: meta }
+                accountId:
+                    type: string
+                    maxLength: 100
+                    pattern: '^act_[0-9]+$'
+                    description: For account-prefixed endpoints, optional assigned target or stored connection context, with stored context injected upstream. Required for numeric GET objects and numeric/adsets, numeric/ads or numeric/insights; selects the assigned target account for parent ownership verification. Never an RWYS UUID.
+                endpoint:
+                    type: string
+                    maxLength: 100
+                    pattern: '^/?(?:act_[0-9]+(?:/(?:campaigns|insights|adsets|ads|adcreatives|adimages))?|[0-9]+(?:/(?:adsets|ads|insights))?)$'
+                    description: GET supports assigned account roots and listed edges, or numeric objects and numeric/adsets, numeric/ads or numeric/insights with required target accountId. Parent ownership is verified first. For numeric/adsets, campaign_id must match the numeric parent; for numeric/ads, campaign_id or adset_id must match the numeric parent. Foreign-key mismatch is an invalid provider response, not an authorized cross-parent result. POST creates only on account-prefixed campaigns, adsets, ads, adcreatives or adimages. Optional leading slash; no URL, query string, arbitrary path, update or delete.
+                method: { type: string, enum: [GET, POST] }
+                description: { type: string, minLength: 1, maxLength: 200 }
+                payload: { type: object }
+            allOf:
+                - if:
+                      properties:
+                          method: { const: GET }
+                  then:
+                      properties:
+                          payload:
+                              { $ref: '#/components/schemas/AdKitReadPayload' }
+                - if:
+                      properties:
+                          endpoint:
+                              {
+                                  pattern: '^/?[0-9]+(?:/(?:adsets|ads|insights))?$',
+                              }
+                  then:
+                      required: [accountId]
+                - if:
+                      properties:
+                          method: { const: POST }
+                  then:
+                      properties:
+                          endpoint:
+                              {
+                                  pattern: '^/?act_[0-9]+/(?:campaigns|adsets|ads|adcreatives|adimages)$',
+                              }
+                      oneOf:
+                          - properties:
+                                endpoint:
+                                    { pattern: '^/?act_[0-9]+/campaigns$' }
+                                payload:
+                                    {
+                                        $ref: '#/components/schemas/AdKitCampaignPayload',
+                                    }
+                          - properties:
+                                endpoint: { pattern: '^/?act_[0-9]+/adsets$' }
+                                payload:
+                                    {
+                                        $ref: '#/components/schemas/AdKitAdSetPayload',
+                                    }
+                          - properties:
+                                endpoint: { pattern: '^/?act_[0-9]+/ads$' }
+                                payload:
+                                    {
+                                        $ref: '#/components/schemas/AdKitAdPayload',
+                                    }
+                          - properties:
+                                endpoint:
+                                    { pattern: '^/?act_[0-9]+/adcreatives$' }
+                                payload:
+                                    {
+                                        $ref: '#/components/schemas/AdKitCreativePayload',
+                                    }
+                          - properties:
+                                endpoint: { pattern: '^/?act_[0-9]+/adimages$' }
+                                payload:
+                                    {
+                                        $ref: '#/components/schemas/AdKitImagePayload',
+                                    }
+        AdKitReadPayload:
+            type: object
+            additionalProperties: false
+            description: Only whitelisted read parameters are accepted. fields is a comma-separated list of distinct approved scalar provider fields appropriate to the endpoint, not a Graph expansion or arbitrary query. Account roots allow id, account_id, name, account_status, disable_reason, currency, timezone_name. Object and non-insight edges allow id, account_id, name, status, effective_status, objective, daily_budget, lifetime_budget, created_time, updated_time, campaign_id, adset_id, page_id. adimages allows id, account_id, hash, name, url, width, height, original_width, original_height, status. Insights allow account_id, account_currency, campaign_id, campaign_name, adset_id, adset_name, ad_id, ad_name, impressions, reach, clicks, spend, cpc, cpm, ctr, date_start, date_stop. RWYS may add upstream identity fields for authorization and removes only those additions before returning the provider projection. Insights require exactly one of time_range or date_preset; other reads cannot supply time_range, date_preset or level. hashes is allowed only on adimages. No credentials, headers, project, host or mutation fields are accepted.
+            required: [fields]
+            properties:
+                fields:
+                    type: string
+                    maxLength: 1000
+                    pattern: '^[a-z_]+(?:,[a-z_]+)*$'
+                limit: { type: integer, minimum: 1, maximum: 100, default: 25 }
+                after:
+                    type: string
+                    minLength: 1
+                    maxLength: 4096
+                    pattern: '^[A-Za-z0-9_+=/\-]{1,4096}$'
+                    description: Opaque provider continuation cursor, not a URL. Reuse only with the same authorized endpoint and filters.
+                time_range:
+                    type: string
+                    maxLength: 100
+                    contentMediaType: application/json
+                    description: JSON-encoded object with since and until ISO dates, not a nested JSON request object. since <= until <= today, at most 90 days inclusive. Mutually exclusive with date_preset.
+                    contentSchema:
+                        type: object
+                        additionalProperties: false
+                        required: [since, until]
+                        properties:
+                            since: { type: string, format: date }
+                            until: { type: string, format: date }
+                    example: '{"since":"2026-08-26","until":"2026-10-26"}'
+                date_preset:
+                    type: string
+                    enum:
+                        [
+                            today,
+                            yesterday,
+                            this_month,
+                            last_month,
+                            this_quarter,
+                            maximum,
+                            last_3d,
+                            last_7d,
+                            last_14d,
+                            last_28d,
+                            last_30d,
+                            last_90d,
+                            last_week_mon_sun,
+                            last_week_sun_sat,
+                            last_quarter,
+                            last_year,
+                            this_week_mon_today,
+                            this_week_sun_today,
+                            this_year,
+                        ]
+                    description: Provider date preset, including maximum. Mutually exclusive with time_range.
+                level: { type: string, enum: [account, campaign, adset, ad] }
+                hashes:
+                    type: string
+                    maxLength: 10000
+                    contentMediaType: application/json
+                    description: adimages only. JSON-encoded list of 1 to 100 hexadecimal image hashes, each 32 characters.
+                    contentSchema:
+                        type: array
+                        minItems: 1
+                        maxItems: 100
+                        items: { type: string, pattern: '^[a-fA-F0-9]{32}$' }
+            not:
+                required: [time_range, date_preset]
+        AdKitNumericId:
+            description: Raw provider numeric ID, not an RWYS UUID.
+            oneOf:
+                - { type: string, pattern: '^[0-9]+$' }
+                - { type: integer, minimum: 0 }
+        AdKitBudget:
+            description: Client-chosen positive integer in minor units, passed unchanged. No forced amount. Decimal, negative and zero values are rejected.
+            oneOf:
+                - { type: integer, minimum: 1 }
+                - { type: string, pattern: '^[0-9]*[1-9][0-9]*$' }
+        AdKitCampaignPayload:
+            type: object
+            additionalProperties: false
+            required: [name, objective, status, special_ad_categories]
+            properties:
+                name: { type: string, minLength: 1, maxLength: 255 }
+                objective:
+                    {
+                        type: string,
+                        maxLength: 100,
+                        pattern: '^[A-Z][A-Z0-9_]*$',
+                    }
+                status:
+                    { type: string, enum: [ACTIVE, PAUSED, DELETED, ARCHIVED] }
+                daily_budget: { $ref: '#/components/schemas/AdKitBudget' }
+                lifetime_budget: { $ref: '#/components/schemas/AdKitBudget' }
+                bid_strategy:
+                    {
+                        type: string,
+                        maxLength: 100,
+                        pattern: '^[A-Z][A-Z0-9_]*$',
+                    }
+                special_ad_categories:
+                    type: string
+                    contentMediaType: application/json
+                    description: JSON-encoded array, including an empty array, not a nested request array.
+                    contentSchema:
+                        type: array
+                        maxItems: 20
+                        items: { type: string, pattern: '^[A-Z_]{1,100}$' }
+        AdKitAdSetPayload:
+            type: object
+            additionalProperties: false
+            required:
+                [
+                    campaign_id,
+                    name,
+                    targeting,
+                    billing_event,
+                    optimization_goal,
+                    promoted_object,
+                    status,
+                ]
+            properties:
+                campaign_id: { $ref: '#/components/schemas/AdKitNumericId' }
+                name: { type: string, minLength: 1, maxLength: 255 }
+                targeting:
+                    type: string
+                    maxLength: 65536
+                    contentMediaType: application/json
+                    description: JSON-encoded targeting object. Provider-specific targeting keys are preserved, not interpreted as permissions.
+                    contentSchema: { type: object, additionalProperties: true }
+                billing_event:
+                    {
+                        type: string,
+                        maxLength: 100,
+                        pattern: '^[A-Z][A-Z0-9_]*$',
+                    }
+                optimization_goal:
+                    {
+                        type: string,
+                        maxLength: 100,
+                        pattern: '^[A-Z][A-Z0-9_]*$',
+                    }
+                promoted_object:
+                    type: string
+                    maxLength: 4096
+                    contentMediaType: application/json
+                    contentSchema:
+                        type: object
+                        additionalProperties: false
+                        required: [page_id]
+                        properties:
+                            page_id:
+                                { $ref: '#/components/schemas/AdKitNumericId' }
+                            pixel_id:
+                                { $ref: '#/components/schemas/AdKitNumericId' }
+                            application_id:
+                                { $ref: '#/components/schemas/AdKitNumericId' }
+                            custom_event_type:
+                                { type: string, minLength: 1, maxLength: 100 }
+                status:
+                    { type: string, enum: [ACTIVE, PAUSED, DELETED, ARCHIVED] }
+                daily_budget: { $ref: '#/components/schemas/AdKitBudget' }
+                lifetime_budget: { $ref: '#/components/schemas/AdKitBudget' }
+                bid_strategy:
+                    {
+                        type: string,
+                        maxLength: 100,
+                        pattern: '^[A-Z][A-Z0-9_]*$',
+                    }
+                bid_amount: { $ref: '#/components/schemas/AdKitBudget' }
+                start_time:
+                    type: string
+                    maxLength: 100
+                    description: Laravel-valid date string, passed to the provider unchanged.
+                end_time:
+                    type: string
+                    maxLength: 100
+                    description: Laravel-valid date string, passed to the provider unchanged.
+                is_dynamic_creative: { type: boolean }
+        AdKitAdPayload:
+            type: object
+            additionalProperties: false
+            required: [adset_id, creative, name, status]
+            properties:
+                adset_id: { $ref: '#/components/schemas/AdKitNumericId' }
+                creative:
+                    type: string
+                    maxLength: 4096
+                    contentMediaType: application/json
+                    description: JSON-encoded creative reference. Ownership of the adset and creative is verified.
+                    contentSchema:
+                        type: object
+                        additionalProperties: false
+                        required: [creative_id]
+                        properties:
+                            creative_id:
+                                { $ref: '#/components/schemas/AdKitNumericId' }
+                name: { type: string, minLength: 1, maxLength: 255 }
+                status:
+                    { type: string, enum: [ACTIVE, PAUSED, DELETED, ARCHIVED] }
+        AdKitCreativePayload:
+            type: object
+            additionalProperties: false
+            required: [name, object_story_spec]
+            properties:
+                name: { type: string, minLength: 1, maxLength: 255 }
+                object_story_spec:
+                    type: string
+                    maxLength: 65536
+                    contentMediaType: application/json
+                    description: JSON-encoded object with page_id and exactly one of photo_data or link_data. Page membership, optional Instagram association and image hash ownership are verified before dispatch. No credentials or arbitrary nested fields.
+                    contentSchema:
+                        type: object
+                        additionalProperties: false
+                        required: [page_id]
+                        oneOf:
+                            - required: [photo_data]
+                            - required: [link_data]
+                        properties:
+                            page_id:
+                                { $ref: '#/components/schemas/AdKitNumericId' }
+                            instagram_user_id:
+                                { $ref: '#/components/schemas/AdKitNumericId' }
+                            photo_data:
+                                type: object
+                                additionalProperties: false
+                                required: [image_hash]
+                                properties:
+                                    image_hash:
+                                        {
+                                            type: string,
+                                            pattern: '^[a-fA-F0-9]{32}$',
+                                        }
+                                    caption:
+                                        {
+                                            type: string,
+                                            minLength: 1,
+                                            maxLength: 10000,
+                                        }
+                            link_data:
+                                type: object
+                                additionalProperties: false
+                                required: [image_hash, link]
+                                properties:
+                                    image_hash:
+                                        {
+                                            type: string,
+                                            pattern: '^[a-fA-F0-9]{32}$',
+                                        }
+                                    link:
+                                        {
+                                            type: string,
+                                            format: uri,
+                                            pattern: '^https://',
+                                            maxLength: 2048,
+                                        }
+                                    message:
+                                        {
+                                            type: string,
+                                            minLength: 1,
+                                            maxLength: 10000,
+                                        }
+                                    name:
+                                        {
+                                            type: string,
+                                            minLength: 1,
+                                            maxLength: 255,
+                                        }
+                                    description:
+                                        {
+                                            type: string,
+                                            minLength: 1,
+                                            maxLength: 1000,
+                                        }
+                                    call_to_action:
+                                        type: object
+                                        additionalProperties: false
+                                        required: [type]
+                                        properties:
+                                            type:
+                                                {
+                                                    type: string,
+                                                    minLength: 1,
+                                                    maxLength: 100,
+                                                }
+                                            value:
+                                                type: object
+                                                additionalProperties: false
+                                                required: [link]
+                                                properties:
+                                                    link:
+                                                        {
+                                                            type: string,
+                                                            format: uri,
+                                                            pattern: '^https://',
+                                                            maxLength: 2048,
+                                                        }
+        AdKitImagePayload:
+            type: object
+            additionalProperties: false
+            required: [bytes]
+            properties:
+                bytes:
+                    type: string
+                    maxLength: 2796204
+                    contentEncoding: base64
+                    description: Canonical base64 of a complete JPEG or PNG, decoded size at most 2097152 bytes. Width and height each 1 to 8192; at most 16777216 pixels. No remote image URL or multipart upload.
+        AdKitForwardResponse:
+            oneOf:
+                - $ref: '#/components/schemas/AdKitReadResponse'
+                - $ref: '#/components/schemas/AdKitPublishedResponse'
+                - $ref: '#/components/schemas/AdKitDraftResponse'
+        AdKitReadResponse:
+            type: object
+            additionalProperties: false
+            description: Preserves the provider forwarding envelope. response is the raw provider object and results is the raw provider array, including provider IDs, string metrics and provider pagination when present. No fabricated zero metrics, normalized rows or campaign UUID mappings. Nested provider objects remain extensible according to the provider contract.
+            required: [platform, status, response, results, request_id]
+            properties:
+                platform: { type: string, const: meta }
+                status: { type: string, const: executed }
+                response: { type: object, additionalProperties: true }
+                results:
+                    type: array
+                    items: { type: object, additionalProperties: true }
+                request_id: { $ref: '#/components/schemas/RequestId' }
+        AdKitPublishedResponse:
+            type: object
+            additionalProperties: true
+            description: Preserved, credential-sanitized provider write receipt, not a normalized domain API. No live activation claim. Each raw result has a numeric provider id (platformId, if present, must match) or, for adimages, exactly one image entry with a 32-character hexadecimal hash. Account identities must match the authorized target.
+            required: [platform, status, results, request_id]
+            properties:
+                platform: { type: string, const: meta }
+                status: { type: string, const: published }
+                results:
+                    type: array
+                    minItems: 1
+                    items:
+                        type: object
+                        additionalProperties: true
+                        required: [raw]
+                        properties:
+                            platformId: { type: string, pattern: '^[0-9]+$' }
+                            raw: { type: object, additionalProperties: true }
+                request_id: { $ref: '#/components/schemas/RequestId' }
+        AdKitDraftResponse:
+            type: object
+            additionalProperties: true
+            description: Preserved, credential-sanitized draft envelope. Transport accepts draft or pending plus a nonblank draftId. Synthetic fixtures only; live draft support is unverified and this is not evidence of provider execution or activation.
+            required: [platform, status, draftId, request_id]
+            properties:
+                platform: { type: string, const: meta }
+                status: { type: string, enum: [draft, pending] }
+                draftId: { type: string, minLength: 1, pattern: '\S' }
+                request_id: { $ref: '#/components/schemas/RequestId' }
+        AdKitReceiptPersistenceErrorResponse:
+            type: object
+            additionalProperties: false
+            description: Confirmed provider receipt could not be saved to the database ledger. Safe recovery evidence, not an execution failure or a raw provider error. Replay only with the same idempotency key; do not create a new idempotency key. The local encrypted receipt journal is a fallback only after ledger-save failure, not a distributed guarantee and not proof that fallback storage succeeded. X-Operation-Id identifies the existing Client-owned operation. resource_ids and image_hashes may be empty, especially for drafts; no credentials or raw receipt diagnostics are exposed.
+            required:
+                [
+                    error,
+                    message,
+                    provider_status,
+                    resource_ids,
+                    image_hashes,
+                    request_id,
+                ]
+            properties:
+                error: { type: string, const: adkit_receipt_persistence_failed }
+                message: { type: string }
+                provider_status:
+                    { type: string, enum: [published, draft, pending] }
+                resource_ids:
+                    type: array
+                    items: { type: string, pattern: '^[0-9]+$' }
+                image_hashes:
+                    type: array
+                    items: { type: string, pattern: '^[a-fA-F0-9]{32}$' }
+                request_id: { $ref: '#/components/schemas/RequestId' }
+        AdKitErrorResponse:
+            type: object
+            additionalProperties: false
+            required: [error, message, request_id]
+            properties:
+                error:
+                    type: string
+                    enum:
+                        - adkit_configuration_error
+                        - adkit_connection_invalid
+                        - adkit_mapping_invalid
+                        - adkit_unreachable
+                        - adkit_rate_limited
+                        - adkit_authentication_failed
+                        - adkit_invalid_response
+                        - adkit_response_too_large
+                        - adkit_invalid_request
+                        - adkit_provider_error
+                        - adkit_idempotency_conflict
+                        - adkit_operation_pending
+                        - adkit_unconfirmed
+                        - adkit_draft_unsupported
+                        - adkit_receipt_journal_invalid
+                message: { type: string }
+                request_id: { $ref: '#/components/schemas/RequestId' }
         PublishPostRequest:
             type: object
             additionalProperties: false
@@ -530,7 +1213,9 @@ components:
                 ]
             properties:
                 id: { type: string, format: uuid }
-                capability: { type: string }
+                capability:
+                    type: string
+                    description: Operation classification; adkit.write is a ledger kind, not a token permission. Existing Client ownership and operations.read route authorization apply.
                 status: { type: string }
                 account_id: { type: [string, 'null'], format: uuid }
                 outcome: { type: [object, 'null'], additionalProperties: true }

@@ -12,11 +12,12 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AuthorizeAgentRequest
 {
-    public function handle(Request $request, Closure $next, string $ability): Response
+    public function handle(Request $request, Closure $next, ?string $ability = null): Response
     {
         $token = $request->user()?->currentAccessToken();
 
-        if (! $token instanceof PersonalAccessToken || $token->client_id === null || $token->revoked_at !== null || ! $token->can($ability)) {
+        if (! $token instanceof PersonalAccessToken || $token->client_id === null || $token->revoked_at !== null
+            || ($ability !== null && ! $token->can($ability))) {
             return $this->denied('The token is not authorized for this operation.', 403);
         }
 

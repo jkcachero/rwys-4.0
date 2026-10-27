@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\AgentOperation;
 use App\Models\Client;
+use App\Models\PersonalAccessToken;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,17 +20,13 @@ class AgentOperationController extends Controller
             'limit' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'cursor' => ['sometimes', 'uuid'],
         ]);
-        $client = $request->attributes->get('agent_client');
-        abort_unless($client instanceof Client, 403);
         $limit = (int) ($validated['limit'] ?? 25);
-        $query = AgentOperation::query()
-            ->whereBelongsTo($client)
+        $query = $this->authorizedQuery($request)
             ->latest('requested_at')
             ->latest('id');
 
         if (isset($validated['cursor'])) {
-            $cursor = AgentOperation::query()
-                ->whereBelongsTo($client)
+            $cursor = $this->authorizedQuery($request)
                 ->where('public_id', $validated['cursor'])
                 ->firstOrFail();
             $query->where($this->beforeCursor($cursor));
@@ -51,10 +48,29 @@ class AgentOperationController extends Controller
     public function show(Request $request, AgentOperation $operation): JsonResponse
     {
         $this->rejectUnknownQuery($request, []);
-        $client = $request->attributes->get('agent_client');
-        abort_unless($client instanceof Client && $operation->client_id === $client->getKey(), 404);
+        $operation = $this->authorizedQuery($request)->whereKey($operation->getKey())->firstOrFail();
 
         return response()->json(['data' => $this->serialize($operation)]);
+    }
+
+    /** @return Builder<AgentOperation> */
+    private function authorizedQuery(Request $request): Builder
+    {
+        $client = $request->attributes->get('agent_client');
+        $token = $request->attributes->get('agent_token');
+        abort_unless($client instanceof Client && $token instanceof PersonalAccessToken, 403);
+
+        return AgentOperation::query()
+            ->with('providerAccount:id,public_id')
+            ->whereBelongsTo($client)
+            ->where(function (Builder $query) use ($client, $token): void {
+                $query->where('capability', '!=', 'adkit.write')
+                    ->orWhereHas('providerAccount', function (Builder $query) use ($client, $token): void {
+                        $query->assignedAdKitTo($client)
+                            ->when($token->allowed_account_ids !== [], fn (Builder $query) => $query
+                                ->whereIn('public_id', $token->allowed_account_ids));
+                    });
+            });
     }
 
     private function beforeCursor(AgentOperation $cursor): \Closure

@@ -12,13 +12,20 @@ class ProviderConnectionTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_provider_connections_are_limited_to_configured_admins(): void
+    public function test_provider_connections_page_is_no_longer_available(): void
     {
-        $user = User::factory()->create(['email_verified_at' => now()]);
+        $user = User::factory()->create(['role' => 'admin', 'email_verified_at' => now()]);
+        $connection = $user->providerConnections()->create([
+            'provider' => 'zernio',
+            'access_token' => 'existing-token',
+            'scopes' => ['profiles:read', 'accounts:read'],
+        ]);
 
         $this->actingAs($user)
             ->get('/settings/connections')
-            ->assertForbidden();
+            ->assertNotFound();
+
+        $this->assertSame('existing-token', $connection->fresh()->access_token);
     }
 
     public function test_admin_authorization_uses_pkce_and_the_exact_loopback_redirect(): void
@@ -68,7 +75,7 @@ class ProviderConnectionTest extends TestCase
             ->put('/settings/connections/zernio', [
                 'api_token' => 'zernio-secret-token',
             ])
-            ->assertRedirect('/settings/connections')
+            ->assertRedirect('/settings/agent-access')
             ->assertSessionHas('status', 'Zernio is connected for profile assignment.');
 
         $connection = ProviderConnection::query()
